@@ -15,6 +15,7 @@ envoy_cc_library(
     hdrs = ["header_validator.h"],
     deps = [
         "//envoy/http:header_validator_interface",
+        "//external:abseil_node_hash_set",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],
 )
