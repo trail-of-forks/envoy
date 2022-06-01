@@ -92,8 +92,7 @@ Http2HeaderValidator::validateResponseHeader(const ::Envoy::Http::HeaderString& 
     return validateStatusPseudoHeaderValue(StatusPseudoHeaderValidationMode::ValueRange, value);
   }
 
-  bool allow_underscores{true};
-  auto status = validateGenericHeaderKey(allow_underscores, key);
+  auto status = validateGenericHeaderKey(GenericHeaderNameValidationMode::Compatibility, key);
   if (status != ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Accept) {
     return status;
   }
@@ -129,8 +128,7 @@ Http2HeaderValidator::validateRequestHeader(bool restrict_http_methods,
     return validateTransferEncodingHeaderValue(value);
   }
 
-  bool allow_underscores{true};
-  auto status = validateGenericHeaderKey(allow_underscores, key);
+  auto status = validateGenericHeaderKey(GenericHeaderNameValidationMode::Compatibility, key);
   if (status != ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Accept) {
     return status;
   }
@@ -447,15 +445,27 @@ Http2HeaderValidator::validatePathPseudoHeaderValue(const ::Envoy::Http::HeaderS
 }
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
-Http2HeaderValidator::validateGenericHeaderKey(bool allow_underscores,
+Http2HeaderValidator::validateGenericHeaderKey(const GenericHeaderNameValidationMode& mode,
                                                const ::Envoy::Http::HeaderString& key) {
   const auto& key_string_view = key.getStringView();
 
   for (std::size_t i{0}; i < key_string_view.size(); ++i) {
     const auto& c = key_string_view.at(i);
 
-    auto is_valid = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
-                    (allow_underscores && c == '_') || (c == '-');
+    bool is_valid = false;
+
+    if (mode == GenericHeaderNameValidationMode::Strict ||
+        mode == GenericHeaderNameValidationMode::StrictWithoutUnderscores) {
+
+      auto allow_underscores = mode != GenericHeaderNameValidationMode::StrictWithoutUnderscores;
+
+      is_valid = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+                 (allow_underscores && c == '_') || (c == '-');
+
+    } else if (mode == GenericHeaderNameValidationMode::Compatibility) {
+      is_valid = kNghttp2HeaderNameCharacterValidationMap[static_cast<std::size_t>(c)] != 0;
+    }
+
     if (!is_valid) {
       return ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Reject;
     }

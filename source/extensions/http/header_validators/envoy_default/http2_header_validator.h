@@ -97,9 +97,22 @@ public:
   static HeaderEntryValidationResult
   validatePathPseudoHeaderValue(const ::Envoy::Http::HeaderString& value);
 
+  // Configuration for validateGenericHeaderKey
+  enum class GenericHeaderNameValidationMode {
+    // Strict
+    Strict,
+
+    // Strict, but without support for undescores
+    StrictWithoutUnderscores,
+
+    // Use the old nghttp2 character table
+    Compatibility,
+  };
+
   // Validates the given header key. Used when a more specific validator is not available
   static HeaderEntryValidationResult
-  validateGenericHeaderKey(bool allow_underscores, const ::Envoy::Http::HeaderString& key);
+  validateGenericHeaderKey(const GenericHeaderNameValidationMode& mode,
+                           const ::Envoy::Http::HeaderString& key);
 
   // Configuration for validateGenericHeaderValue
   enum class GenericHeaderValueValidationMode {
