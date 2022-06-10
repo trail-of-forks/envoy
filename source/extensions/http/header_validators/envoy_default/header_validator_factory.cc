@@ -1,6 +1,7 @@
-#include "source/extensions/http/header_validators/envoy_default/header_validator.h"
+#include "source/extensions/http/header_validators/envoy_default/header_validator_factory.h"
 
 #include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
+#include "source/extensions/http/header_validators/envoy_default/http_header_validator.h"
 #include "source/extensions/http/header_validators/envoy_default/null_header_validator.h"
 
 namespace Envoy {
@@ -23,6 +24,10 @@ HeaderValidatorFactory::create(::Envoy::Http::HeaderValidatorFactory::Protocol p
 
   if (protocol == ::Envoy::Http::HeaderValidatorFactory::Protocol::HTTP2) {
     validator = std::make_unique<Http2HeaderValidator>(config_, stream_info);
+
+  } else if (protocol == ::Envoy::Http::HeaderValidatorFactory::Protocol::HTTP1) {
+    validator = std::make_unique<HttpHeaderValidator>(config_, stream_info);
+
   } else {
     validator = std::make_unique<NullHeaderValidator>(config_, stream_info);
   }

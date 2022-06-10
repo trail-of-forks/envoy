@@ -12,13 +12,15 @@ envoy_extension_package()
 envoy_cc_library(
     name = "header_validator",
     srcs = [
-        "header_validator.cc",
+        "header_validator_factory.cc",
         "http2_header_validator.cc",
+        "http_header_validator.cc",
         "null_header_validator.cc",
     ],
     hdrs = [
-        "header_validator.h",
+        "header_validator_factory.h",
         "http2_header_validator.h",
+        "http_header_validator.h",
         "nghttp2_character_maps.h",
         "null_header_validator.h",
     ],

@@ -9,9 +9,9 @@ namespace Http {
 namespace HeaderValidators {
 namespace EnvoyDefault {
 
-class NullHeaderValidator : public ::Envoy::Http::HeaderValidator {
+class HttpHeaderValidator : public ::Envoy::Http::HeaderValidator {
 public:
-  NullHeaderValidator(
+  HttpHeaderValidator(
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config,
       StreamInfo::StreamInfo& stream_info);
@@ -29,6 +29,11 @@ public:
 
   ResponseHeaderMapValidationResult
   validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) override;
+
+private:
+  // Configuration
+  const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
+      config_;
 };
 
 } // namespace EnvoyDefault
