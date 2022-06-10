@@ -64,13 +64,23 @@ Http2HeaderValidator::Http2HeaderValidator(const HeaderValidatorConfig& config,
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
                                                  const HeaderString& value) {
-  return validateRequestHeader(config_.restrict_http_methods(), key, value);
+  GenericHeaderNameValidationMode mode{GenericHeaderNameValidationMode::Compatibility};
+  if (config_.reject_headers_with_underscores()) {
+    mode = GenericHeaderNameValidationMode::StrictWithoutUnderscores;
+  }
+
+  return validateRequestHeader(mode, config_.restrict_http_methods(), key, value);
 }
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
                                                   const HeaderString& value) {
-  return validateResponseHeader(key, value);
+  GenericHeaderNameValidationMode mode{GenericHeaderNameValidationMode::Compatibility};
+  if (config_.reject_headers_with_underscores()) {
+    mode = GenericHeaderNameValidationMode::StrictWithoutUnderscores;
+  }
+
+  return validateResponseHeader(mode, key, value);
 }
 
 ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult
@@ -84,15 +94,15 @@ Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
 }
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
-Http2HeaderValidator::validateResponseHeader(const ::Envoy::Http::HeaderString& key,
+Http2HeaderValidator::validateResponseHeader(const GenericHeaderNameValidationMode& mode,
+                                             const ::Envoy::Http::HeaderString& key,
                                              const ::Envoy::Http::HeaderString& value) {
   const auto& key_string_view = key.getStringView();
-
   if (key_string_view == ":status") {
     return validateStatusPseudoHeaderValue(StatusPseudoHeaderValidationMode::ValueRange, value);
   }
 
-  auto status = validateGenericHeaderKey(GenericHeaderNameValidationMode::Compatibility, key);
+  auto status = validateGenericHeaderKey(mode, key);
   if (status != ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Accept) {
     return status;
   }
@@ -101,7 +111,8 @@ Http2HeaderValidator::validateResponseHeader(const ::Envoy::Http::HeaderString& 
 }
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
-Http2HeaderValidator::validateRequestHeader(bool restrict_http_methods,
+Http2HeaderValidator::validateRequestHeader(const GenericHeaderNameValidationMode& mode,
+                                            bool restrict_http_methods,
                                             const ::Envoy::Http::HeaderString& key,
                                             const ::Envoy::Http::HeaderString& value) {
   const auto& key_string_view = key.getStringView();
@@ -128,7 +139,7 @@ Http2HeaderValidator::validateRequestHeader(bool restrict_http_methods,
     return validateTransferEncodingHeaderValue(value);
   }
 
-  auto status = validateGenericHeaderKey(GenericHeaderNameValidationMode::Compatibility, key);
+  auto status = validateGenericHeaderKey(mode, key);
   if (status != ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Accept) {
     return status;
   }

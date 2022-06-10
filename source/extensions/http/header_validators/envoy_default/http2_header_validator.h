@@ -30,14 +30,28 @@ public:
   ResponseHeaderMapValidationResult
   validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) override;
 
+  // Configuration for validateResponseHeader and validateRequestHeader
+  enum class GenericHeaderNameValidationMode {
+    // Strict
+    Strict,
+
+    // Strict, but without support for undescores
+    StrictWithoutUnderscores,
+
+    // Use the old nghttp2 character table
+    Compatibility,
+  };
+
   // Validates the specified response header entry
   static HeaderEntryValidationResult
-  validateResponseHeader(const ::Envoy::Http::HeaderString& key,
+  validateResponseHeader(const GenericHeaderNameValidationMode& mode,
+                         const ::Envoy::Http::HeaderString& key,
                          const ::Envoy::Http::HeaderString& value);
 
   // Validates the specified request header entry
   static HeaderEntryValidationResult
-  validateRequestHeader(bool restrict_http_methods, const ::Envoy::Http::HeaderString& key,
+  validateRequestHeader(const GenericHeaderNameValidationMode& mode, bool restrict_http_methods,
+                        const ::Envoy::Http::HeaderString& key,
                         const ::Envoy::Http::HeaderString& value);
 
   // Validates the header map keys, looking for pseudo header that should not present
@@ -97,18 +111,6 @@ public:
   // Validates the given path pseudo header value
   static HeaderEntryValidationResult
   validatePathPseudoHeaderValue(const ::Envoy::Http::HeaderString& value);
-
-  // Configuration for validateGenericHeaderKey
-  enum class GenericHeaderNameValidationMode {
-    // Strict
-    Strict,
-
-    // Strict, but without support for undescores
-    StrictWithoutUnderscores,
-
-    // Use the old nghttp2 character table
-    Compatibility,
-  };
 
   // Validates the given header key. Used when a more specific validator is not available
   static HeaderEntryValidationResult
