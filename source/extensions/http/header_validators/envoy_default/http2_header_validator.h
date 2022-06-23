@@ -35,32 +35,9 @@ public:
     // Strict
     Strict,
 
-    // Strict, but without support for undescores
-    StrictWithoutUnderscores,
-
-    // Use the old nghttp2 character table
-    Compatibility,
+    // Strict but reject underscores
+    RejectUnderscores
   };
-
-  // Validates the specified response header entry
-  static HeaderEntryValidationResult
-  validateResponseHeader(const GenericHeaderNameValidationMode& mode,
-                         const ::Envoy::Http::HeaderString& key,
-                         const ::Envoy::Http::HeaderString& value);
-
-  // Validates the specified request header entry
-  static HeaderEntryValidationResult
-  validateRequestHeader(const GenericHeaderNameValidationMode& mode, bool restrict_http_methods,
-                        const ::Envoy::Http::HeaderString& key,
-                        const ::Envoy::Http::HeaderString& value);
-
-  // Validates the header map keys, looking for pseudo header that should not present
-  static RequestHeaderMapValidationResult
-  validateRequestPseudoHeaderKeys(::Envoy::Http::RequestHeaderMap& header_map);
-
-  // Validates the header map keys, looking for pseudo header that should not present
-  static ResponseHeaderMapValidationResult
-  validateResponsePseudoHeaderKeys(::Envoy::Http::ResponseHeaderMap& header_map);
 
   // Validates the given method pseudo header value
   static HeaderEntryValidationResult
@@ -117,19 +94,9 @@ public:
   validateGenericHeaderKey(const GenericHeaderNameValidationMode& mode,
                            const ::Envoy::Http::HeaderString& key);
 
-  // Configuration for validateGenericHeaderValue
-  enum class GenericHeaderValueValidationMode {
-    // Strict
-    Strict,
-
-    // Use the old nghttp2 character table
-    Compatibility,
-  };
-
   // Validates the given header value. Used when a more specific validator is not available
   static HeaderEntryValidationResult
-  validateGenericHeaderValue(const GenericHeaderValueValidationMode& mode,
-                             const ::Envoy::Http::HeaderString& value);
+  validateGenericHeaderValue(const ::Envoy::Http::HeaderString& value);
 
 private:
   // Configuration

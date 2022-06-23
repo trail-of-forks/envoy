@@ -16,47 +16,6 @@ namespace EnvoyDefault {
 using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig;
 using ::Envoy::Http::HeaderString;
 
-namespace {
-
-template <typename HeaderMapType, typename ReturnType>
-ReturnType validateHeaderMap(const HeaderMapType& header_map,
-                             const absl::node_hash_set<absl::string_view>& allowed_headers) {
-
-  static_assert(std::is_same<HeaderMapType, ::Envoy::Http::RequestHeaderMap>::value ||
-                    std::is_same<HeaderMapType, ::Envoy::Http::ResponseHeaderMap>::value,
-                "Invalid HeaderMapType template parameter");
-
-  static_assert(
-      std::is_same<ReturnType,
-                   ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult>::value ||
-          std::is_same<ReturnType,
-                       ::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult>::value,
-      "Invalid ReturnType template parameter");
-
-  auto result = ReturnType::Accept;
-
-  header_map.iterate([&result, &allowed_headers](const ::Envoy::Http::HeaderEntry& header_entry)
-                         -> ::Envoy::Http::HeaderMap::Iterate {
-    const auto& header_name = header_entry.key();
-    const auto& string_header_name = header_name.getStringView();
-
-    if (string_header_name.at(0) != ':') {
-      return ::Envoy::Http::HeaderMap::Iterate::Continue;
-    }
-
-    if (!allowed_headers.contains(header_name.getStringView())) {
-      result = ReturnType::Reject;
-      return ::Envoy::Http::HeaderMap::Iterate::Break;
-    }
-
-    return ::Envoy::Http::HeaderMap::Iterate::Continue;
-  });
-
-  return result;
-}
-
-} // namespace
-
 Http2HeaderValidator::Http2HeaderValidator(const HeaderValidatorConfig& config,
                                            StreamInfo::StreamInfo&)
     : config_(config) {}
@@ -64,91 +23,78 @@ Http2HeaderValidator::Http2HeaderValidator(const HeaderValidatorConfig& config,
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
                                                  const HeaderString& value) {
-  GenericHeaderNameValidationMode mode{GenericHeaderNameValidationMode::Compatibility};
-  if (config_.reject_headers_with_underscores()) {
-    mode = GenericHeaderNameValidationMode::StrictWithoutUnderscores;
+  const auto& key_string_view = key.getStringView();
+
+  if (!key_string_view.size()) {
+    // reject empty header names
+    return ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Reject;
   }
 
-  return validateRequestHeader(mode, config_.restrict_http_methods(), key, value);
+  if (key_string_view == ":method" && config_.restrict_http_methods()) {
+    // Verify that the :method matches a well known value if the configuration is set to
+    // restrict methods. When not restricting methods, the generic validation will validate
+    // the :method value.
+    return validateMethodPseudoHeaderValue(value);
+  } else if (key_string_view == ":authority") {
+    // Validate the :authority header
+    return validateAuthorityPseudoHeaderValue(value);
+  } else if (key_string_view == ":scheme") {
+    // Validate the :scheme header, allowing for uppercase characters
+    return validateSchemePseudoHeaderValue(SchemaPseudoHeaderValidationMode::AllowUppercase, value);
+  } else if (key_string_view == ":path") {
+    // Validate the :path header
+    return validatePathPseudoHeaderValue(value);
+  } else if (key_string_view == "TE") {
+    // Validate the :transfer-encoding header
+    return validateTransferEncodingHeaderValue(value);
+  } else if (key_string_view.at(0) != ':') {
+    // Validate the (non-pseudo) header name
+    auto mode = GenericHeaderNameValidationMode::Strict;
+    if (config_.reject_headers_with_underscores()) {
+      mode = GenericHeaderNameValidationMode::RejectUnderscores;
+    }
+
+    auto status = validateGenericHeaderKey(mode, key);
+    if (status == ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Reject) {
+      return status;
+    }
+  }
+
+  // Validate the header value
+  return validateGenericHeaderValue(value);
 }
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
                                                   const HeaderString& value) {
-  GenericHeaderNameValidationMode mode{GenericHeaderNameValidationMode::Compatibility};
-  if (config_.reject_headers_with_underscores()) {
-    mode = GenericHeaderNameValidationMode::StrictWithoutUnderscores;
+  const auto& key_string_view = key.getStringView();
+  if (!key_string_view.size()) {
+    // reject empty header names
+    return ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Reject;
   }
 
-  return validateResponseHeader(mode, key, value);
+  if (key_string_view == ":status") {
+    // Validate the :status header against the RFC valid range (100 <= status < 600)
+    return validateStatusPseudoHeaderValue(StatusPseudoHeaderValidationMode::ValueRange, value);
+  } else if (key_string_view.at(0) != ':') {
+    // Validate non-pseudo header names
+    GenericHeaderNameValidationMode mode{GenericHeaderNameValidationMode::Strict};
+    if (config_.reject_headers_with_underscores()) {
+      mode = GenericHeaderNameValidationMode::RejectUnderscores;
+    }
+
+    auto status = validateGenericHeaderKey(mode, key);
+    if (status == ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Reject) {
+      return status;
+    }
+  }
+
+  // Validate the header value
+  return validateGenericHeaderValue(value);
 }
 
 ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult
 Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& header_map) {
-  return validateRequestPseudoHeaderKeys(header_map);
-}
-
-::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult
-Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) {
-  return validateResponsePseudoHeaderKeys(header_map);
-}
-
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
-Http2HeaderValidator::validateResponseHeader(const GenericHeaderNameValidationMode& mode,
-                                             const ::Envoy::Http::HeaderString& key,
-                                             const ::Envoy::Http::HeaderString& value) {
-  const auto& key_string_view = key.getStringView();
-  if (key_string_view == ":status") {
-    return validateStatusPseudoHeaderValue(StatusPseudoHeaderValidationMode::ValueRange, value);
-  }
-
-  auto status = validateGenericHeaderKey(mode, key);
-  if (status != ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Accept) {
-    return status;
-  }
-
-  return validateGenericHeaderValue(GenericHeaderValueValidationMode::Compatibility, value);
-}
-
-::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
-Http2HeaderValidator::validateRequestHeader(const GenericHeaderNameValidationMode& mode,
-                                            bool restrict_http_methods,
-                                            const ::Envoy::Http::HeaderString& key,
-                                            const ::Envoy::Http::HeaderString& value) {
-  const auto& key_string_view = key.getStringView();
-
-  if (key_string_view == ":method") {
-    auto status{::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Accept};
-
-    if (restrict_http_methods) {
-      status = validateMethodPseudoHeaderValue(value);
-    }
-
-    return status;
-
-  } else if (key_string_view == ":authority") {
-    return validateAuthorityPseudoHeaderValue(value);
-
-  } else if (key_string_view == ":scheme") {
-    return validateSchemePseudoHeaderValue(SchemaPseudoHeaderValidationMode::AllowUppercase, value);
-
-  } else if (key_string_view == ":path") {
-    return validatePathPseudoHeaderValue(value);
-
-  } else if (key_string_view == "TE") {
-    return validateTransferEncodingHeaderValue(value);
-  }
-
-  auto status = validateGenericHeaderKey(mode, key);
-  if (status != ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Accept) {
-    return status;
-  }
-
-  return validateGenericHeaderValue(GenericHeaderValueValidationMode::Compatibility, value);
-}
-
-::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult
-Http2HeaderValidator::validateRequestPseudoHeaderKeys(::Envoy::Http::RequestHeaderMap& header_map) {
   static const absl::node_hash_set<absl::string_view> kAllowedPseudoHeadersForConnect = {
       ":method",
       ":authority",
@@ -159,6 +105,9 @@ Http2HeaderValidator::validateRequestPseudoHeaderKeys(::Envoy::Http::RequestHead
       ":method", ":scheme", ":authority", ":path", ":content-length",
   };
 
+  //
+  // Step 1: verify that required pseudo headers are present
+  //
   // The method pseudo header is always mandatory
   if (header_map.getMethodValue().empty()) {
     return ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult::Reject;
@@ -174,40 +123,80 @@ Http2HeaderValidator::validateRequestPseudoHeaderKeys(::Envoy::Http::RequestHead
   // Finally, make sure this request only contains allowed headers
   const auto& allowed_headers =
       is_connect_method ? kAllowedPseudoHeadersForConnect : kAllowedPseudoHeaders;
+  auto status = ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult::Accept;
 
-  auto status = validateHeaderMap<::Envoy::Http::RequestHeaderMap,
-                                  ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult>(
-      header_map, allowed_headers);
+  //
+  // Step 2: Verify each request header
+  //
+  header_map.iterate(
+      [this, &status, &allowed_headers](
+          const ::Envoy::Http::HeaderEntry& header_entry) -> ::Envoy::Http::HeaderMap::Iterate {
+        const auto& header_name = header_entry.key();
+        const auto& header_value = header_entry.value();
+        const auto& string_header_name = header_name.getStringView();
 
-  if (status == ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult::Reject) {
-    return status;
-  }
+        if (string_header_name.at(0) == ':' && !allowed_headers.contains(string_header_name)) {
+          // This is an unrecognized pseudo header, reject the request
+          status = ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult::Reject;
+        } else if (validateRequestHeaderEntry(header_name, header_value) ==
+                   ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Reject) {
+          status = ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult::Reject;
+        }
 
-  return ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult::Accept;
+        return status == ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult::Accept
+                   ? ::Envoy::Http::HeaderMap::Iterate::Continue
+                   : ::Envoy::Http::HeaderMap::Iterate::Break;
+      });
+
+  return status;
 }
 
 ::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult
-Http2HeaderValidator::validateResponsePseudoHeaderKeys(
-    ::Envoy::Http::ResponseHeaderMap& header_map) {
+Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) {
   static const absl::node_hash_set<absl::string_view> kAllowedPseudoHeaders = {
       ":status",
       ":content-length",
   };
 
+  //
+  // Step 1: verify that required pseudo headers are present
+  //
   if (header_map.getStatusValue().empty()) {
     return ::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult::Reject;
   }
 
-  return validateHeaderMap<::Envoy::Http::ResponseHeaderMap,
-                           ::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult>(
-      header_map, kAllowedPseudoHeaders);
+  //
+  // Step 2: Verify each request header
+  //
+  auto status = ::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult::Accept;
+  header_map.iterate([this, &status](const ::Envoy::Http::HeaderEntry& header_entry)
+                         -> ::Envoy::Http::HeaderMap::Iterate {
+    const auto& header_name = header_entry.key();
+    const auto& header_value = header_entry.value();
+    const auto& string_header_name = header_name.getStringView();
+
+    if (string_header_name.at(0) == ':' &&
+        !kAllowedPseudoHeaders.contains(header_name.getStringView())) {
+      // This is an unrecognized pseudo header, reject the response
+      status = ::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult::Reject;
+    } else if (validateResponseHeaderEntry(header_name, header_value) ==
+               ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Reject) {
+      status = ::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult::Reject;
+    }
+
+    return status == ::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult::Accept
+               ? ::Envoy::Http::HeaderMap::Iterate::Continue
+               : ::Envoy::Http::HeaderMap::Iterate::Break;
+  });
+
+  return status;
 }
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateMethodPseudoHeaderValue(const ::Envoy::Http::HeaderString& value) {
   // HTTP Method Registry, from iana.org
   // source: https://www.iana.org/assignments/http-methods/http-methods.xhtml
-  absl::node_hash_set<absl::string_view> kHttpMethodRegistry = {
+  static absl::node_hash_set<absl::string_view> kHttpMethodRegistry = {
       "ACL",
       "BASELINE-CONTROL",
       "BIND",
@@ -258,6 +247,7 @@ Http2HeaderValidator::validateMethodPseudoHeaderValue(const ::Envoy::Http::Heade
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateTransferEncodingHeaderValue(
     const ::Envoy::Http::HeaderString& value) {
+  // Only allow a transfer encoding of "trailers" for HTTP/2
   return value.getStringView() == "trailers"
              ? ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Accept
              : ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Reject;
@@ -329,17 +319,21 @@ Http2HeaderValidator::validateAuthorityPseudoHeaderValue(const ::Envoy::Http::He
 
   auto user_info_delimiter = value_string_view.find('@');
   if (user_info_delimiter != absl::string_view::npos) {
+    // :authority cannot contain user info, reject the header
     return ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Reject;
   }
 
+  // identify and validate the port, if present
   auto port_delimiter = value_string_view.find(':');
   auto host_string_view = value_string_view.substr(0, port_delimiter);
 
   if (host_string_view.empty()) {
+    // reject empty host, which happens if the authority is just the port (e.g.- ":80").
     return ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Reject;
   }
 
   if (port_delimiter != absl::string_view::npos) {
+    // Validate the port is an integer and a valid port number (uint16_t)
     auto port_string_view = value_string_view.substr(port_delimiter + 1);
 
     auto port_string_view_size = port_string_view.size();
@@ -352,7 +346,7 @@ Http2HeaderValidator::validateAuthorityPseudoHeaderValue(const ::Envoy::Http::He
 
     std::uint32_t port_integer_value{};
     auto result = std::from_chars(buffer_start, buffer_end, port_integer_value);
-    if (result.ec == std::errc::invalid_argument) {
+    if (result.ec == std::errc::invalid_argument || result.ptr != buffer_end) {
       return ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Reject;
     }
 
@@ -459,66 +453,36 @@ Http2HeaderValidator::validatePathPseudoHeaderValue(const ::Envoy::Http::HeaderS
 Http2HeaderValidator::validateGenericHeaderKey(const GenericHeaderNameValidationMode& mode,
                                                const ::Envoy::Http::HeaderString& key) {
   const auto& key_string_view = key.getStringView();
+  bool is_valid = key_string_view.size() > 0;
+  bool allow_underscores = mode == GenericHeaderNameValidationMode::Strict;
 
-  for (std::size_t i{0}; i < key_string_view.size(); ++i) {
+  for (std::size_t i{0}; i < key_string_view.size() && is_valid; ++i) {
     const auto& c = key_string_view.at(i);
 
-    bool is_valid = false;
-
-    if (mode == GenericHeaderNameValidationMode::Strict ||
-        mode == GenericHeaderNameValidationMode::StrictWithoutUnderscores) {
-
-      auto allow_underscores = mode != GenericHeaderNameValidationMode::StrictWithoutUnderscores;
-
-      is_valid = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
-                 (allow_underscores && c == '_') || (c == '-');
-
-    } else if (mode == GenericHeaderNameValidationMode::Compatibility) {
-      is_valid = kNghttp2HeaderNameCharacterValidationMap[static_cast<std::size_t>(c)] != 0;
-    }
-
-    if (!is_valid) {
-      return ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Reject;
-    }
+    // use the nghttp2 character map to verify this is a valid character and honor the
+    // underscore configuration
+    is_valid = kNghttp2HeaderNameCharacterValidationMap[static_cast<unsigned char>(c)] &&
+               (c != '_' || allow_underscores);
   }
 
-  return ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Accept;
+  return is_valid ? ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Accept
+                  : ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Reject;
 }
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
-Http2HeaderValidator::validateGenericHeaderValue(const GenericHeaderValueValidationMode& mode,
-                                                 const ::Envoy::Http::HeaderString& value) {
-  // https://developers.cloudflare.com/rules/transform/request-header-modification/reference/header-format/
-  static const absl::node_hash_set<char> kAllowedCharacterList = {
-      '_', ' ', ':', ';', '.', ',', '\\', '/', '"', '\'', '?', '!', '(', ')', '{', '}', '[',
-      ']', '@', '<', '>', '=', '-', '+',  '*', '#', '$',  '&', '`', '|', '~', '^', '%'};
-
+Http2HeaderValidator::validateGenericHeaderValue(const ::Envoy::Http::HeaderString& value) {
   const auto& value_string_view = value.getStringView();
+  bool is_valid = true;
 
-  for (std::size_t i{0}; i < value_string_view.size(); ++i) {
+  for (std::size_t i{0}; i < value_string_view.size() && is_valid; ++i) {
     const auto& c = value_string_view.at(i);
 
-    bool is_valid = false;
-    switch (mode) {
-    case GenericHeaderValueValidationMode::Strict:
-      is_valid =
-          (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || kAllowedCharacterList.contains(c);
-      break;
-
-    case GenericHeaderValueValidationMode::Compatibility:
-      is_valid = kNghttp2HeaderValueCharacterValidationMap[static_cast<std::size_t>(c)] != 0;
-      break;
-
-    default:
-      break;
-    }
-
-    if (!is_valid) {
-      return ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Reject;
-    }
+    // use the nghttp2 character map to verify this is a valid character.
+    is_valid = kNghttp2HeaderValueCharacterValidationMap[static_cast<unsigned char>(c)];
   }
 
-  return ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Accept;
+  return is_valid ? ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Accept
+                  : ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult::Reject;
 }
 
 } // namespace EnvoyDefault
