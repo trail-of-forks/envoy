@@ -1,60 +1,23 @@
-#include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
-
-#include "source/common/network/utility.h"
-#include "source/extensions/http/header_validators/envoy_default/config.h"
-
-#include "test/mocks/server/factory_context.h"
-#include "test/mocks/stream_info/mocks.h"
-#include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
+#include "test/extensions/http/header_validators/envoy_default/header_validator_test.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Http {
 namespace HeaderValidators {
 namespace EnvoyDefault {
-
-using ::Envoy::Http::HeaderString;
-using ::Envoy::Http::HeaderValidatorFactory;
-
 namespace {
 
-constexpr absl::string_view empty_config = R"EOF(
-    name: envoy.http.header_validators.envoy_default
-    typed_config:
-        "@type": type.googleapis.com/envoy.extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig
-)EOF";
+using ::Envoy::Http::HeaderString;
 
-} // namespace
-
-class HeaderValidatorTest : public testing::Test {
+class Http1HeaderValidatorTest : public HeaderValidatorTest {
 protected:
-  ::Envoy::Http::HeaderValidatorPtr create(absl::string_view config_yaml,
-                                           HeaderValidatorFactory::Protocol protocol) {
-    auto* factory =
-        Registry::FactoryRegistry<Envoy::Http::HeaderValidatorFactoryConfig>::getFactory(
-            "envoy.http.header_validators.envoy_default");
-    ASSERT(factory != nullptr);
-
-    envoy::config::core::v3::TypedExtensionConfig typed_config;
-    TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
-
-    uhv_factory_ = factory->createFromProto(typed_config.typed_config(), context_);
-    return uhv_factory_->create(protocol, stream_info_);
+  ::Envoy::Http::HeaderValidatorPtr createH1(absl::string_view config_yaml) {
+    return create(config_yaml, Envoy::Http::HeaderValidatorFactory::Protocol::HTTP1);
   }
-
-  void setHeaderStringUnvalidated(HeaderString& header_string, absl::string_view value) {
-    header_string.setCopyUnvalidatedForTestOnly(value);
-  }
-
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
-  ::Envoy::Http::HeaderValidatorFactorySharedPtr uhv_factory_;
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
 };
 
-TEST_F(HeaderValidatorTest, Http1RequestHeaderNameValidation) {
-  auto uhv = create(empty_config, HeaderValidatorFactory::Protocol::HTTP1);
+TEST_F(Http1HeaderValidatorTest, Http1RequestHeaderNameValidation) {
+  auto uhv = createH1(empty_config);
   // Since the default UHV does not yet check anything all header values should be accepted
   std::string key_value("aaa");
   HeaderString key(key_value);
@@ -67,8 +30,8 @@ TEST_F(HeaderValidatorTest, Http1RequestHeaderNameValidation) {
   }
 }
 
-TEST_F(HeaderValidatorTest, Http1ResponseHeaderNameValidation) {
-  auto uhv = create(empty_config, HeaderValidatorFactory::Protocol::HTTP1);
+TEST_F(Http1HeaderValidatorTest, Http1ResponseHeaderNameValidation) {
+  auto uhv = createH1(empty_config);
   // Since the default UHV does not yet check anything all header values should be accepted
   std::string key_value("aaa");
   HeaderString key(key_value);
@@ -81,21 +44,22 @@ TEST_F(HeaderValidatorTest, Http1ResponseHeaderNameValidation) {
   }
 }
 
-TEST_F(HeaderValidatorTest, Http1RequestHeaderMapValidation) {
-  auto uhv = create(empty_config, HeaderValidatorFactory::Protocol::HTTP1);
+TEST_F(Http1HeaderValidatorTest, Http1RequestHeaderMapValidation) {
+  auto uhv = createH1(empty_config);
   ::Envoy::Http::TestRequestHeaderMapImpl request_header_map{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
   EXPECT_EQ(uhv->validateRequestHeaderMap(request_header_map),
             ::Envoy::Http::HeaderValidator::RequestHeaderMapValidationResult::Accept);
 }
 
-TEST_F(HeaderValidatorTest, Http1ResponseHeaderMapValidation) {
-  auto uhv = create(empty_config, HeaderValidatorFactory::Protocol::HTTP1);
+TEST_F(Http1HeaderValidatorTest, Http1ResponseHeaderMapValidation) {
+  auto uhv = createH1(empty_config);
   ::Envoy::Http::TestResponseHeaderMapImpl response_header_map{{":status", "200"}};
   EXPECT_EQ(uhv->validateResponseHeaderMap(response_header_map),
             ::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult::Accept);
 }
 
+} // namespace
 } // namespace EnvoyDefault
 } // namespace HeaderValidators
 } // namespace Http
