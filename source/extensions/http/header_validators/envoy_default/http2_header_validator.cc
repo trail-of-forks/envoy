@@ -109,12 +109,20 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   //
   // Step 1: verify that required pseudo headers are present
   //
-  // The method pseudo header is always mandatory
+  // The method pseudo header is always mandatory.
+  //
   if (header_map.getMethodValue().empty()) {
     return HeaderValidator::RequestHeaderMapValidationResult::Reject;
   }
 
-  // If this is not a connect request, then we also need the scheme and path pseudo headers
+  //
+  // If this is not a connect request, then we also need the scheme and path pseudo headers.
+  // This is based on RFC 7540, https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.3:
+  //
+  // All HTTP/2 requests MUST include exactly one valid value for the ":method", ":scheme",
+  // and ":path" pseudo-header fields, unless it is a CONNECT request (Section 8.3). An
+  // HTTP request that omits mandatory pseudo-header fields is malformed (Section 8.1.2.6).
+  //
   auto is_connect_method = header_map.method() == "CONNECT";
   if (!is_connect_method &&
       (header_map.getSchemeValue().empty() || header_map.getPathValue().empty())) {
@@ -161,6 +169,9 @@ Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
 
   //
   // Step 1: verify that required pseudo headers are present
+  //
+  // For HTTP/2 responses, RFC 7540 states that only the :status
+  // header is required: https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.4
   //
   if (header_map.getStatusValue().empty()) {
     return HeaderValidator::ResponseHeaderMapValidationResult::Reject;
@@ -248,7 +259,14 @@ Http2HeaderValidator::validateMethodPseudoHeaderValue(const ::Envoy::Http::Heade
 HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateTransferEncodingHeaderValue(
     const ::Envoy::Http::HeaderString& value) {
-  // Only allow a transfer encoding of "trailers" for HTTP/2
+  //
+  // Only allow a transfer encoding of "trailers" for HTTP/2, based on
+  // RFC 7540, https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.2:
+  //
+  // The only exception to this is the TE header field, which MAY be present
+  // in an HTTP/2 request; when it is, it MUST NOT contain any value other
+  // than "trailers".
+  //
   return value.getStringView() == "trailers" ? HeaderValidator::HeaderEntryValidationResult::Accept
                                              : HeaderValidator::HeaderEntryValidationResult::Reject;
 }
@@ -256,9 +274,18 @@ Http2HeaderValidator::validateTransferEncodingHeaderValue(
 HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateSchemePseudoHeaderValue(const SchemaPseudoHeaderValidationMode& mode,
                                                       const ::Envoy::Http::HeaderString& value) {
-  // From the RFC:
   //
-  //   scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )
+  // From RFC 3986, https://datatracker.ietf.org/doc/html/rfc3986#section-3.1:
+  //
+  // scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )
+  //
+  // Although schemes are case-insensitive, the canonical form is lowercase and
+  // documents that specify schemes must do so with lowercase letters. An
+  // implementation should accept uppercase letters as equivalent to lowercase
+  // in scheme names (e.g., allow "HTTP" as well as "http") for the sake of
+  // robustness but should only produce lowercase scheme names for consistency.
+  //
+  // The validation mode controls whether uppercase letters are permitted.
   //
 
   // SchemaPseudoHeaderValidationMode::Strict
@@ -284,6 +311,7 @@ Http2HeaderValidator::validateSchemePseudoHeaderValue(const SchemaPseudoHeaderVa
 
   auto character_it = value_string_view.begin();
 
+  // The first character must be an ALPHA
   auto valid_first_character = (*character_it >= 'a' && *character_it <= 'z');
   if (!valid_first_character && mode == SchemaPseudoHeaderValidationMode::AllowUppercase) {
     valid_first_character = (*character_it >= 'A' && *character_it <= 'Z');
@@ -308,13 +336,18 @@ Http2HeaderValidator::validateSchemePseudoHeaderValue(const SchemaPseudoHeaderVa
 
 HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateAuthorityPseudoHeaderValue(const ::Envoy::Http::HeaderString& value) {
-  // From the RFC:
   //
-  //   authority = [ userinfo "@" ] host [ ":" port ]
+  // From RFC 3986, https://datatracker.ietf.org/doc/html/rfc3986#section-3.2:
   //
-  // The `userinfo` portion is deprecated in HTTP2, so reject the value
-  // if it is present.
-
+  // authority = [ userinfo "@" ] host [ ":" port ]
+  //
+  // HTTP/2 deprecates the userinfo portion of the :authority header. Validate
+  // the :authority header and reject the value if the userinfo is present. This
+  // is beased on RFC 7540, https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.3
+  //
+  // The host portion can be any valid URI host, which this function deos not
+  // validate. The port, if present, is validated as a valid uint16_t port.
+  //
   const auto& value_string_view = value.getStringView();
 
   auto user_info_delimiter = value_string_view.find('@');
@@ -361,7 +394,12 @@ Http2HeaderValidator::validateAuthorityPseudoHeaderValue(const ::Envoy::Http::He
 HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateStatusPseudoHeaderValue(const StatusPseudoHeaderValidationMode& mode,
                                                       const ::Envoy::Http::HeaderString& value) {
+  //
+  // This is based on RFC 7231, https://datatracker.ietf.org/doc/html/rfc7231#section-6,
+  // describing the list of response status codes.
+  //
   // https://en.wikipedia.org/wiki/List_of_HTTP_status_codes
+  //
   static const absl::node_hash_set<std::uint32_t> kOfficialStatusCodes = {
       100, 102, 103, 200, 201, 202, 203, 204, 205, 206, 207, 208, 226, 300, 301, 302,
       303, 304, 305, 306, 307, 308, 400, 401, 402, 403, 404, 405, 406, 407, 408, 409,
@@ -452,15 +490,27 @@ Http2HeaderValidator::validatePathPseudoHeaderValue(const ::Envoy::Http::HeaderS
 HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateGenericHeaderKey(const GenericHeaderNameValidationMode& mode,
                                                const ::Envoy::Http::HeaderString& key) {
+  //
+  // Use the nghttp2 character map to verify that the header name is valid. This
+  // also honors the underscore in header configuration setting.
+  //
+  // From RFC-7230, https://datatracker.ietf.org/doc/html/rfc7230:
+  //
+  // header-field   = field-name ":" OWS field-value OWS
+  // field-name     = token
+  // token          = 1*tchar
+  //
+  // tchar          = "!" / "#" / "$" / "%" / "&" / "'" / "*"
+  //                / "+" / "-" / "." / "^" / "_" / "`" / "|" / "~"
+  //                / DIGIT / ALPHA
+  //                ; any VCHAR, except delimiters
+  //
   const auto& key_string_view = key.getStringView();
   bool is_valid = key_string_view.size() > 0;
   bool allow_underscores = mode == GenericHeaderNameValidationMode::Strict;
 
   for (std::size_t i{0}; i < key_string_view.size() && is_valid; ++i) {
     const auto& c = key_string_view.at(i);
-
-    // use the nghttp2 character map to verify this is a valid character and honor the
-    // underscore configuration
     is_valid = kNghttp2HeaderNameCharacterValidationMap[static_cast<unsigned char>(c)] &&
                (c != '_' || allow_underscores);
   }
@@ -471,13 +521,25 @@ Http2HeaderValidator::validateGenericHeaderKey(const GenericHeaderNameValidation
 
 HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateGenericHeaderValue(const ::Envoy::Http::HeaderString& value) {
+  //
+  // use the nghttp2 character map to verify the header value is valid.
+  //
+  // From RFC-7230, https://datatracker.ietf.org/doc/html/rfc7230:
+  //
+  // header-field   = field-name ":" OWS field-value OWS
+  // field-value    = *( field-content / obs-fold )
+  // field-content  = field-vchar [ 1*( SP / HTAB ) field-vchar ]
+  // field-vchar    = VCHAR / obs-text
+  // obs-text       = %x80-FF
+  //
+  // VCHAR          =  %x21-7E
+  //                   ; visible (printing) characters
+  //
   const auto& value_string_view = value.getStringView();
   bool is_valid = true;
 
   for (std::size_t i{0}; i < value_string_view.size() && is_valid; ++i) {
     const auto& c = value_string_view.at(i);
-
-    // use the nghttp2 character map to verify this is a valid character.
     is_valid = kNghttp2HeaderValueCharacterValidationMap[static_cast<unsigned char>(c)];
   }
 
