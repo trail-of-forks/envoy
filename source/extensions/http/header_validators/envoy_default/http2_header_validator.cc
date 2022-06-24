@@ -492,7 +492,7 @@ Http2HeaderValidator::validateGenericHeaderKey(const GenericHeaderNameValidation
   // Use the nghttp2 character map to verify that the header name is valid. This
   // also honors the underscore in header configuration setting.
   //
-  // From RFC-7230, https://datatracker.ietf.org/doc/html/rfc7230:
+  // From RFC 7230, https://datatracker.ietf.org/doc/html/rfc7230:
   //
   // header-field   = field-name ":" OWS field-value OWS
   // field-name     = token
@@ -503,9 +503,21 @@ Http2HeaderValidator::validateGenericHeaderKey(const GenericHeaderNameValidation
   //                / DIGIT / ALPHA
   //                ; any VCHAR, except delimiters
   //
+  //
+  // Also, for HTTP/2, connection-specific headers must be treated as malformed.
+  // From RFC 7540, https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.2:
+  //
+  // any message containing connection-specific header fields MUST be treated
+  // as malformed (Section 8.1.2.6).
+  //
+  static const absl::node_hash_set<absl::string_view> kRejectHeaderNames = {
+      "transfer-encoding", "connection", "upgrade", "keep-alive", "proxy-connection"};
+
   const auto& key_string_view = key.getStringView();
-  bool is_valid = key_string_view.size() > 0;
   bool allow_underscores = mode == GenericHeaderNameValidationMode::Strict;
+  // This header name is initially invalid if the name is empty or if the name
+  // matches an incompatible connection-specific header.
+  bool is_valid = key_string_view.size() > 0 && !kRejectHeaderNames.contains(key_string_view);
 
   for (std::size_t i{0}; i < key_string_view.size() && is_valid; ++i) {
     const auto& c = key_string_view.at(i);

@@ -266,6 +266,26 @@ TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyStrict) {
             HeaderValidator::HeaderEntryValidationResult::Reject);
 }
 
+TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyConnectionRejected) {
+  auto mode = Http2HeaderValidator::GenericHeaderNameValidationMode::Strict;
+  HeaderString transfer_encoding{"transfer-encoding"};
+  HeaderString connection{"connection"};
+  HeaderString keep_alive{"keep-alive"};
+  HeaderString upgrade{"upgrade"};
+  HeaderString proxy_connection{"proxy-connection"};
+
+  EXPECT_EQ(Http2HeaderValidator::validateGenericHeaderKey(mode, transfer_encoding),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(Http2HeaderValidator::validateGenericHeaderKey(mode, connection),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(Http2HeaderValidator::validateGenericHeaderKey(mode, keep_alive),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(Http2HeaderValidator::validateGenericHeaderKey(mode, upgrade),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(Http2HeaderValidator::validateGenericHeaderKey(mode, proxy_connection),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+}
+
 TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderValue) {
   HeaderString valid{"hello world"};
   HeaderString valid_eascii{"value\x80"};
