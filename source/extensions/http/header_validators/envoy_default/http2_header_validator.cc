@@ -99,12 +99,10 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   static const absl::node_hash_set<absl::string_view> kAllowedPseudoHeadersForConnect = {
       ":method",
       ":authority",
-      ":content-length",
   };
 
   static const absl::node_hash_set<absl::string_view> kAllowedPseudoHeaders = {
-      ":method", ":scheme", ":authority", ":path", ":content-length",
-  };
+      ":method", ":scheme", ":authority", ":path"};
 
   //
   // Step 1: verify that required pseudo headers are present
@@ -162,10 +160,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
 
 HeaderValidator::ResponseHeaderMapValidationResult
 Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) {
-  static const absl::node_hash_set<absl::string_view> kAllowedPseudoHeaders = {
-      ":status",
-      ":content-length",
-  };
+  static const absl::node_hash_set<absl::string_view> kAllowedPseudoHeaders = {":status"};
 
   //
   // Step 1: verify that required pseudo headers are present
