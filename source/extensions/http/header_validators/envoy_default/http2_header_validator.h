@@ -98,6 +98,10 @@ public:
   static HeaderEntryValidationResult
   validateGenericHeaderValue(const ::Envoy::Http::HeaderString& value);
 
+  // Validate the content-length header.
+  static HeaderEntryValidationResult
+  validateContentLength(const ::Envoy::Http::HeaderString& value);
+
 private:
   // Configuration
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&

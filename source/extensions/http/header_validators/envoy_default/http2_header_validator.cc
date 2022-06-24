@@ -36,8 +36,8 @@ Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
     // restrict methods. When not restricting methods, the generic validation will validate
     // the :method value.
     return validateMethodPseudoHeaderValue(value);
-  } else if (key_string_view == ":authority") {
-    // Validate the :authority header
+  } else if (key_string_view == ":authority" || key_string_view == "host") {
+    // Validate the :authority or legacy host header
     return validateAuthorityPseudoHeaderValue(value);
   } else if (key_string_view == ":scheme") {
     // Validate the :scheme header, allowing for uppercase characters
@@ -48,6 +48,9 @@ Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
   } else if (key_string_view == "TE") {
     // Validate the :transfer-encoding header
     return validateTransferEncodingHeaderValue(value);
+  } else if (key_string_view == "content-length") {
+    // Validate the content-length header
+    return validateContentLength(value);
   } else if (key_string_view.at(0) != ':') {
     // Validate the (non-pseudo) header name
     auto mode = GenericHeaderNameValidationMode::Strict;
@@ -519,7 +522,7 @@ Http2HeaderValidator::validateGenericHeaderValue(const ::Envoy::Http::HeaderStri
   //
   // use the nghttp2 character map to verify the header value is valid.
   //
-  // From RFC-7230, https://datatracker.ietf.org/doc/html/rfc7230:
+  // From RFC 7230, https://datatracker.ietf.org/doc/html/rfc7230:
   //
   // header-field   = field-name ":" OWS field-value OWS
   // field-value    = *( field-content / obs-fold )
@@ -540,6 +543,31 @@ Http2HeaderValidator::validateGenericHeaderValue(const ::Envoy::Http::HeaderStri
 
   return is_valid ? HeaderValidator::HeaderEntryValidationResult::Accept
                   : HeaderValidator::HeaderEntryValidationResult::Reject;
+}
+
+HeaderValidator::HeaderEntryValidationResult
+Http2HeaderValidator::validateContentLength(const ::Envoy::Http::HeaderString& value) {
+  //
+  // From RFC 7230, https://datatracker.ietf.org/doc/html/rfc7230#section-3.3.2:
+  //
+  // Content-Length = 1*DIGIT
+  //
+  const auto& value_string_view = value.getStringView();
+
+  if (!value_string_view.size()) {
+    return HeaderValidator::HeaderEntryValidationResult::Reject;
+  }
+
+  auto buffer_start = value_string_view.data();
+  auto buffer_end = buffer_start + value_string_view.size();
+
+  std::uint32_t int_value{};
+  auto result = std::from_chars(buffer_start, buffer_end, int_value);
+  if (result.ec == std::errc::invalid_argument || result.ptr != buffer_end) {
+    return HeaderValidator::HeaderEntryValidationResult::Reject;
+  }
+
+  return HeaderValidator::HeaderEntryValidationResult::Accept;
 }
 
 } // namespace EnvoyDefault

@@ -281,6 +281,16 @@ TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderValue) {
             HeaderValidator::HeaderEntryValidationResult::Reject);
 }
 
+TEST_F(Http2HeaderValidatorTest, ValidateContentLength) {
+  HeaderString valid{"100"};
+  HeaderString invalid{"10a2"};
+
+  EXPECT_EQ(Http2HeaderValidator::validateContentLength(valid),
+            HeaderValidator::HeaderEntryValidationResult::Accept);
+  EXPECT_EQ(Http2HeaderValidator::validateContentLength(invalid),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+}
+
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMethodAllowAllMethods) {
   HeaderString method{":method"};
   HeaderString valid{"GET"};
@@ -314,6 +324,30 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderAuthority) {
   EXPECT_EQ(uhv->validateRequestHeaderEntry(authority, valid),
             HeaderValidator::HeaderEntryValidationResult::Accept);
   EXPECT_EQ(uhv->validateRequestHeaderEntry(authority, invalid),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderAuthorityHost) {
+  HeaderString host{"host"};
+  HeaderString valid{"envoy.com"};
+  HeaderString invalid{"user:pass@envoy.com"};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(host, valid),
+            HeaderValidator::HeaderEntryValidationResult::Accept);
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(host, invalid),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderContentLength) {
+  HeaderString content_length{"content-length"};
+  HeaderString valid{"100"};
+  HeaderString invalid{"10a2"};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(content_length, valid),
+            HeaderValidator::HeaderEntryValidationResult::Accept);
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(content_length, invalid),
             HeaderValidator::HeaderEntryValidationResult::Reject);
 }
 
