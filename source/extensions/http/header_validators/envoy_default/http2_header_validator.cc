@@ -17,6 +17,15 @@ using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderVal
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::HeaderValidator;
 
+//
+// Header validation implementation for the Http/2 codec. This class follows guidance from
+// several RFCS:
+//
+// RFC 3986 <https://datatracker.ietf.org/doc/html/rfc3986> URI Generic Syntax
+// RFC 7230 <https://datatracker.ietf.org/doc/html/rfc7230> HTTP/1.1 Message Syntax
+// RFC 7231 <https://datatracker.ietf.org/doc/html/rfc7231> HTTP/1.1 Semantics and Content
+// RFC 7540 <https://datatracker.ietf.org/doc/html/rfc7540> HTTP/2
+//
 Http2HeaderValidator::Http2HeaderValidator(const HeaderValidatorConfig& config,
                                            StreamInfo::StreamInfo&)
     : config_(config) {}
