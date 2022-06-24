@@ -45,6 +45,20 @@ protected:
     typed_config:
         "@type": type.googleapis.com/envoy.extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig
 )EOF";
+
+  static constexpr absl::string_view restrict_http_methods_config = R"EOF(
+    name: envoy.http.header_validators.envoy_default
+    typed_config:
+        "@type": type.googleapis.com/envoy.extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig
+        restrict_http_methods: true
+)EOF";
+
+  static constexpr absl::string_view reject_headers_with_underscores_config = R"EOF(
+    name: envoy.http.header_validators.envoy_default
+    typed_config:
+        "@type": type.googleapis.com/envoy.extensions.http.header_validators.envoy_default.v3.HeaderValidatorConfig
+        reject_headers_with_underscores: true
+)EOF";
 };
 
 } // namespace EnvoyDefault

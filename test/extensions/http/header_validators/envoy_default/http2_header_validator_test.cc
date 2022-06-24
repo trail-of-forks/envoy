@@ -291,11 +291,19 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMethodAllowAllMethods) {
             HeaderValidator::HeaderEntryValidationResult::Accept);
   EXPECT_EQ(uhv->validateRequestHeaderEntry(method, invalid),
             HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(uhv->validateRequestHeaderEntry(method, invalid),
-            HeaderValidator::HeaderEntryValidationResult::Accept);
 }
 
-// TODO(meily) - test for :method when restrict_http_methods=true
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMethodRestrictMethods) {
+  HeaderString method{":method"};
+  HeaderString valid{"GET"};
+  HeaderString invalid{"CUSTOM-METHOD"};
+  auto uhv = createH2(restrict_http_methods_config);
+
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(method, valid),
+            HeaderValidator::HeaderEntryValidationResult::Accept);
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(method, invalid),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+}
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderAuthority) {
   HeaderString authority{":authority"};
@@ -360,6 +368,24 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderGeneric) {
             HeaderValidator::HeaderEntryValidationResult::Reject);
 }
 
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderAllowUnderscores) {
+  HeaderString name{"x_foo"};
+  HeaderString value{"bar"};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(name, value),
+            HeaderValidator::HeaderEntryValidationResult::Accept);
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderRejectUnderscores) {
+  HeaderString name{"x_foo"};
+  HeaderString value{"bar"};
+  auto uhv = createH2(reject_headers_with_underscores_config);
+
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(name, value),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+}
+
 TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderStatus) {
   HeaderString status{":status"};
   HeaderString valid{"200"};
@@ -386,6 +412,24 @@ TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderGeneric) {
   EXPECT_EQ(uhv->validateResponseHeaderEntry(invalid_name, valid_value),
             HeaderValidator::HeaderEntryValidationResult::Reject);
   EXPECT_EQ(uhv->validateResponseHeaderEntry(valid_name, invalid_value),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderAllowUnderscores) {
+  HeaderString name{"x_foo"};
+  HeaderString value{"bar"};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_EQ(uhv->validateResponseHeaderEntry(name, value),
+            HeaderValidator::HeaderEntryValidationResult::Accept);
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderRejectUnderscores) {
+  HeaderString name{"x_foo"};
+  HeaderString value{"bar"};
+  auto uhv = createH2(reject_headers_with_underscores_config);
+
+  EXPECT_EQ(uhv->validateResponseHeaderEntry(name, value),
             HeaderValidator::HeaderEntryValidationResult::Reject);
 }
 
