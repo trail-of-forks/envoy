@@ -1,9 +1,5 @@
 #include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
 
-#include <charconv>
-
-#include "source/extensions/http/header_validators/envoy_default/nghttp2_character_maps.h"
-
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/string_view.h"
 
@@ -41,7 +37,7 @@ Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
   }
 
   if (key_string_view == ":method") {
-    // Verify that the :method matches a well known value if the configuration is set to
+    // Verify that the :method matches a well own value if the configuration is set to
     // restrict methods. When not restricting methods, the generic validation will validate
     // the :method value.
     return validateMethodHeader(value);
@@ -54,9 +50,9 @@ Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
   } else if (key_string_view == ":path") {
     // Validate the :path header
     return validatePathHeader(value);
-  } else if (key_string_view == "TE") {
+  } else if (key_string_view == "te") {
     // Validate the :transfer-encoding header
-    return validateTransferEncodingHeader(value);
+    return validateTEHeader(value);
   } else if (key_string_view == "content-length") {
     // Validate the content-length header
     return validateContentLengthHeader(value);
@@ -122,7 +118,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   // and ":path" pseudo-header fields, unless it is a CONNECT request (Section 8.3). An
   // HTTP request that omits mandatory pseudo-header fields is malformed (Section 8.1.2.6).
   //
-  auto is_connect_method = header_map.method() == "CONNECT";
+  auto is_connect_method = header_map.method() == header_values_.MethodValues.Connect;
   if (!is_connect_method &&
       (header_map.getSchemeValue().empty() || header_map.getPathValue().empty())) {
     return HeaderValidator::RequestHeaderMapValidationResult::Reject;
@@ -201,17 +197,18 @@ Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
 }
 
 HeaderValidator::HeaderEntryValidationResult
-Http2HeaderValidator::validateTransferEncodingHeader(const ::Envoy::Http::HeaderString& value) {
+Http2HeaderValidator::validateTEHeader(const ::Envoy::Http::HeaderString& value) {
   //
-  // Only allow a transfer encoding of "trailers" for HTTP/2, based on
+  // Only allow a TE value of "trailers" for HTTP/2, based on
   // RFC 7540, https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.2:
   //
   // The only exception to this is the TE header field, which MAY be present
   // in an HTTP/2 request; when it is, it MUST NOT contain any value other
   // than "trailers".
   //
-  return value.getStringView() == "trailers" ? HeaderValidator::HeaderEntryValidationResult::Accept
-                                             : HeaderValidator::HeaderEntryValidationResult::Reject;
+  return absl::EqualsIgnoreCase(value.getStringView(), header_values_.TEValues.Trailers)
+             ? HeaderValidator::HeaderEntryValidationResult::Accept
+             : HeaderValidator::HeaderEntryValidationResult::Reject;
 }
 
 HeaderValidator::HeaderEntryValidationResult
@@ -228,47 +225,7 @@ Http2HeaderValidator::validateAuthorityHeader(const ::Envoy::Http::HeaderString&
   // The host portion can be any valid URI host, which this function deos not
   // validate. The port, if present, is validated as a valid uint16_t port.
   //
-  const auto& value_string_view = value.getStringView();
-
-  auto user_info_delimiter = value_string_view.find('@');
-  if (user_info_delimiter != absl::string_view::npos) {
-    // :authority cannot contain user info, reject the header
-    return HeaderValidator::HeaderEntryValidationResult::Reject;
-  }
-
-  // identify and validate the port, if present
-  auto port_delimiter = value_string_view.find(':');
-  auto host_string_view = value_string_view.substr(0, port_delimiter);
-
-  if (host_string_view.empty()) {
-    // reject empty host, which happens if the authority is just the port (e.g.- ":80").
-    return HeaderValidator::HeaderEntryValidationResult::Reject;
-  }
-
-  if (port_delimiter != absl::string_view::npos) {
-    // Validate the port is an integer and a valid port number (uint16_t)
-    auto port_string_view = value_string_view.substr(port_delimiter + 1);
-
-    auto port_string_view_size = port_string_view.size();
-    if (port_string_view_size == 0 || port_string_view_size > 5) {
-      return HeaderValidator::HeaderEntryValidationResult::Reject;
-    }
-
-    auto buffer_start = port_string_view.data();
-    auto buffer_end = buffer_start + port_string_view.size();
-
-    std::uint32_t port_integer_value{};
-    auto result = std::from_chars(buffer_start, buffer_end, port_integer_value);
-    if (result.ec == std::errc::invalid_argument || result.ptr != buffer_end) {
-      return HeaderValidator::HeaderEntryValidationResult::Reject;
-    }
-
-    if (port_integer_value == 0 || port_integer_value >= 65535) {
-      return HeaderValidator::HeaderEntryValidationResult::Reject;
-    }
-  }
-
-  return HeaderValidator::HeaderEntryValidationResult::Accept;
+  return validateHostHeader(value);
 }
 
 HeaderValidator::HeaderEntryValidationResult

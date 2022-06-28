@@ -3,6 +3,8 @@
 #include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
 #include "envoy/http/header_validator.h"
 
+#include "source/common/http/headers.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Http {
@@ -66,10 +68,13 @@ public:
   validateSchemeHeader(const SchemePseudoHeaderValidationMode& mode,
                        const ::Envoy::Http::HeaderString& value);
 
-private:
+  virtual HeaderEntryValidationResult validateHostHeader(const ::Envoy::Http::HeaderString& value);
+
+protected:
   // Configuration
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;
+  const ::Envoy::Http::HeaderValues& header_values_;
 };
 
 } // namespace EnvoyDefault

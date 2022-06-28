@@ -18,8 +18,7 @@ using ::Envoy::Http::HeaderValidator;
 
 HttpHeaderValidator::HttpHeaderValidator(const HeaderValidatorConfig& config,
                                          StreamInfo::StreamInfo&)
-    : config_(config) {
-}
+    : config_(config), header_values_(::Envoy::Http::Headers::get()) {}
 
 HeaderValidator::HeaderEntryValidationResult
 HttpHeaderValidator::validateMethodHeader(const HeaderString& value) {
@@ -338,6 +337,58 @@ HttpHeaderValidator::validateContentLengthHeader(const HeaderString& value) {
   auto result = std::from_chars(buffer_start, buffer_end, int_value);
   if (result.ec == std::errc::invalid_argument || result.ptr != buffer_end) {
     return HeaderValidator::HeaderEntryValidationResult::Reject;
+  }
+
+  return HeaderValidator::HeaderEntryValidationResult::Accept;
+}
+
+HeaderValidator::HeaderEntryValidationResult
+HttpHeaderValidator::validateHostHeader(const HeaderString& value) {
+  //
+  // From RFC 7230, https://datatracker.ietf.org/doc/html/rfc7230#section-5.4,
+  // and RFC 3986, https://datatracker.ietf.org/doc/html/rfc3986#section-3.2.2:
+  //
+  // Host       = uri-host [ ":" port ]
+  // uri-host   = IP-literal / IPv4address / reg-name
+  //
+  const auto& value_string_view = value.getStringView();
+
+  auto user_info_delimiter = value_string_view.find('@');
+  if (user_info_delimiter != absl::string_view::npos) {
+    // :authority cannot contain user info, reject the header
+    return HeaderValidator::HeaderEntryValidationResult::Reject;
+  }
+
+  // identify and validate the port, if present
+  auto port_delimiter = value_string_view.find(':');
+  auto host_string_view = value_string_view.substr(0, port_delimiter);
+
+  if (host_string_view.empty()) {
+    // reject empty host, which happens if the authority is just the port (e.g.- ":80").
+    return HeaderValidator::HeaderEntryValidationResult::Reject;
+  }
+
+  if (port_delimiter != absl::string_view::npos) {
+    // Validate the port is an integer and a valid port number (uint16_t)
+    auto port_string_view = value_string_view.substr(port_delimiter + 1);
+
+    auto port_string_view_size = port_string_view.size();
+    if (port_string_view_size == 0 || port_string_view_size > 5) {
+      return HeaderValidator::HeaderEntryValidationResult::Reject;
+    }
+
+    auto buffer_start = port_string_view.data();
+    auto buffer_end = buffer_start + port_string_view.size();
+
+    std::uint32_t port_integer_value{};
+    auto result = std::from_chars(buffer_start, buffer_end, port_integer_value);
+    if (result.ec == std::errc::invalid_argument || result.ptr != buffer_end) {
+      return HeaderValidator::HeaderEntryValidationResult::Reject;
+    }
+
+    if (port_integer_value == 0 || port_integer_value >= 65535) {
+      return HeaderValidator::HeaderEntryValidationResult::Reject;
+    }
   }
 
   return HeaderValidator::HeaderEntryValidationResult::Accept;

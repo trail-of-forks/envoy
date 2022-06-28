@@ -30,19 +30,17 @@ public:
   validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) override;
 
   // Validates the given transfer encoding header value
-  static HeaderEntryValidationResult
-  validateTransferEncodingHeader(const ::Envoy::Http::HeaderString& value);
+  HeaderEntryValidationResult validateTEHeader(const ::Envoy::Http::HeaderString& value);
 
   // Validates the given authority pseudo header value
-  static HeaderEntryValidationResult
-  validateAuthorityHeader(const ::Envoy::Http::HeaderString& value);
+  HeaderEntryValidationResult validateAuthorityHeader(const ::Envoy::Http::HeaderString& value);
 
   // Validates the given header key. Used when a more specific validator is not available
   virtual HeaderEntryValidationResult
   validateGenericHeaderName(const ::Envoy::Http::HeaderString& name) override;
 
   // Validates the given path pseudo header value
-  static HeaderEntryValidationResult validatePathHeader(const ::Envoy::Http::HeaderString& value);
+  HeaderEntryValidationResult validatePathHeader(const ::Envoy::Http::HeaderString& value);
 };
 
 using Http2HeaderValidatorPtr = std::unique_ptr<Http2HeaderValidator>;
