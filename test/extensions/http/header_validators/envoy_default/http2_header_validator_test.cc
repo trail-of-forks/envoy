@@ -132,43 +132,12 @@ TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderMapInvalidStatus) {
             HeaderValidator::ResponseHeaderMapValidationResult::Reject);
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidateTransferEncoding) {
+TEST_F(Http2HeaderValidatorTest, ValidateTE) {
   HeaderString trailers{"trailers"};
-  HeaderString chunked{"chunked"};
+  HeaderString deflate{"deflate"};
   auto uhv = createH2(empty_config);
-  EXPECT_EQ(uhv->validateTransferEncodingHeader(trailers),
-            HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(uhv->validateTransferEncodingHeader(chunked),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateAuthority) {
-  HeaderString valid{"envoy.com:443"};
-  HeaderString valid_no_port{"envoy.com"};
-  HeaderString invalid_empty{""};
-  HeaderString invalid_userinfo{"foo:bar@envoy.com"};
-  HeaderString invalid_port_int{"envoy.com:a"};
-  HeaderString invalid_port_trailer{"envoy.com:10a"};
-  HeaderString invalid_port_value{"envoy.com:66000"};
-  HeaderString invalid_port_0{"envoy.com:0"};
-  auto uhv = createH2(empty_config);
-
-  EXPECT_EQ(uhv->validateAuthorityHeader(valid),
-            HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(uhv->validateAuthorityHeader(valid_no_port),
-            HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(uhv->validateAuthorityHeader(invalid_empty),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
-  EXPECT_EQ(uhv->validateAuthorityHeader(invalid_userinfo),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
-  EXPECT_EQ(uhv->validateAuthorityHeader(invalid_port_int),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
-  EXPECT_EQ(uhv->validateAuthorityHeader(invalid_port_trailer),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
-  EXPECT_EQ(uhv->validateAuthorityHeader(invalid_port_value),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
-  EXPECT_EQ(uhv->validateAuthorityHeader(invalid_port_0),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(uhv->validateTEHeader(trailers), HeaderValidator::HeaderEntryValidationResult::Accept);
+  EXPECT_EQ(uhv->validateTEHeader(deflate), HeaderValidator::HeaderEntryValidationResult::Reject);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidatePath) {
@@ -234,15 +203,15 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderPath) {
   // TODO(meilya) - add invalid case when path normalization is ready
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderTransferEncoding) {
-  HeaderString transfer_encoding{"TE"};
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderTE) {
+  HeaderString name{"te"};
   HeaderString valid{"trailers"};
   HeaderString invalid{"chunked"};
   auto uhv = createH2(empty_config);
 
-  EXPECT_EQ(uhv->validateRequestHeaderEntry(transfer_encoding, valid),
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(name, valid),
             HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(uhv->validateRequestHeaderEntry(transfer_encoding, invalid),
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(name, invalid),
             HeaderValidator::HeaderEntryValidationResult::Reject);
 }
 

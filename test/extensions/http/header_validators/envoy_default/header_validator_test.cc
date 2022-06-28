@@ -190,6 +190,34 @@ TEST_F(BaseHeaderValidatorTest, ValidateContentLength) {
             HeaderValidator::HeaderEntryValidationResult::Reject);
 }
 
+TEST_F(BaseHeaderValidatorTest, ValidateHostHeader) {
+  HeaderString valid{"envoy.com:443"};
+  HeaderString valid_no_port{"envoy.com"};
+  HeaderString invalid_empty{""};
+  HeaderString invalid_userinfo{"foo:bar@envoy.com"};
+  HeaderString invalid_port_int{"envoy.com:a"};
+  HeaderString invalid_port_trailer{"envoy.com:10a"};
+  HeaderString invalid_port_value{"envoy.com:66000"};
+  HeaderString invalid_port_0{"envoy.com:0"};
+  auto uhv = createBase(empty_config);
+
+  EXPECT_EQ(uhv->validateHostHeader(valid), HeaderValidator::HeaderEntryValidationResult::Accept);
+  EXPECT_EQ(uhv->validateHostHeader(valid_no_port),
+            HeaderValidator::HeaderEntryValidationResult::Accept);
+  EXPECT_EQ(uhv->validateHostHeader(invalid_empty),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(uhv->validateHostHeader(invalid_userinfo),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(uhv->validateHostHeader(invalid_port_int),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(uhv->validateHostHeader(invalid_port_trailer),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(uhv->validateHostHeader(invalid_port_value),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(uhv->validateHostHeader(invalid_port_0),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+}
+
 } // namespace
 } // namespace EnvoyDefault
 } // namespace HeaderValidators
