@@ -30,6 +30,10 @@ protected:
   static constexpr absl::string_view reject_headers_with_underscores_config = R"EOF(
     reject_headers_with_underscores: true
 )EOF";
+
+  static constexpr absl::string_view allow_chunked_length_config = R"EOF(
+    http1_protocol_options: {allow_chunked_length: true}
+)EOF";
 };
 
 } // namespace EnvoyDefault

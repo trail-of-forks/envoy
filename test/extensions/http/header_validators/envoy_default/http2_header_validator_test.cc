@@ -102,6 +102,18 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapInvalidAuthority) {
             HeaderValidator::RequestHeaderMapValidationResult::Reject);
 }
 
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapEmptyGenericName) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "GET"},
+                                                  {":path", "/"},
+                                                  {":authority", "envoy.com"},
+                                                  {"", "bar"}};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_EQ(uhv->validateRequestHeaderMap(headers),
+            HeaderValidator::RequestHeaderMapValidationResult::Reject);
+}
+
 TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderMapValid) {
   ::Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "200"}, {"x-foo", "bar"}};
   auto uhv = createH2(empty_config);
@@ -127,6 +139,13 @@ TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderMapExtraPseudoHeader) {
 
 TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderMapInvalidStatus) {
   ::Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "1024"}, {"x-foo", "bar"}};
+  auto uhv = createH2(empty_config);
+  EXPECT_EQ(uhv->validateResponseHeaderMap(headers),
+            HeaderValidator::ResponseHeaderMapValidationResult::Reject);
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderMapEmptyGenericName) {
+  ::Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "200"}, {"", "bar"}};
   auto uhv = createH2(empty_config);
   EXPECT_EQ(uhv->validateResponseHeaderMap(headers),
             HeaderValidator::ResponseHeaderMapValidationResult::Reject);

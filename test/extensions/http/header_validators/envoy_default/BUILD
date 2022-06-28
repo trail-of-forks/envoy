@@ -17,6 +17,7 @@ envoy_extension_cc_test(
         "header_validator_factory_test.cc",
         "header_validator_test.cc",
         "header_validator_test.h",
+        "http1_header_validator_test.cc",
         "http2_header_validator_test.cc",
         "null_validator_test.cc",
     ],
