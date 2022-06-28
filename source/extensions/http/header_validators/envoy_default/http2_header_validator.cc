@@ -139,7 +139,8 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
         const auto& header_value = header_entry.value();
         const auto& string_header_name = header_name.getStringView();
 
-        if (string_header_name.at(0) == ':' && !allowed_headers.contains(string_header_name)) {
+        if (string_header_name.empty() ||
+            (string_header_name.at(0) == ':' && !allowed_headers.contains(string_header_name))) {
           // This is an unrecognized pseudo header, reject the request
           status = HeaderValidator::RequestHeaderMapValidationResult::Reject;
         } else if (validateRequestHeaderEntry(header_name, header_value) ==
@@ -179,8 +180,9 @@ Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
     const auto& header_value = header_entry.value();
     const auto& string_header_name = header_name.getStringView();
 
-    if (string_header_name.at(0) == ':' &&
-        !kAllowedPseudoHeaders.contains(header_name.getStringView())) {
+    if (string_header_name.empty() ||
+        (string_header_name.at(0) == ':' &&
+         !kAllowedPseudoHeaders.contains(header_name.getStringView()))) {
       // This is an unrecognized pseudo header, reject the response
       status = HeaderValidator::ResponseHeaderMapValidationResult::Reject;
     } else if (validateResponseHeaderEntry(header_name, header_value) ==

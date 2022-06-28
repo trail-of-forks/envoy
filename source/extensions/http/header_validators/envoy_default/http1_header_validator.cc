@@ -118,7 +118,7 @@ Http1HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   // If the authority component is missing or undefined for the target URI, then a
   // client MUST send a Host header field with an empty field-value.
   //
-  if (!header_map.getHostValue().empty()) {
+  if (header_map.getHostValue().empty()) {
     return HeaderValidator::RequestHeaderMapValidationResult::Reject;
   }
 
@@ -192,6 +192,14 @@ Http1HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
         header_map.removeContentLength();
       }
     }
+  } else if (header_map.ContentLength() && is_connect_method) {
+    if (header_map.getContentLengthValue() == "0") {
+      // Remove a 0 content length from a CONNECT request
+      header_map.removeContentLength();
+    } else {
+      // A content length in a CONNECT request is malformed
+      return HeaderValidator::RequestHeaderMapValidationResult::Reject;
+    }
   }
 
   // Finally, make sure this request only contains allowed headers
@@ -206,7 +214,8 @@ Http1HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     const auto& header_value = header_entry.value();
     const auto& string_header_name = header_name.getStringView();
 
-    if (string_header_name.at(0) == ':' && !kAllowedPseudoHeaders.contains(string_header_name)) {
+    if (string_header_name.empty() ||
+        (string_header_name.at(0) == ':' && !kAllowedPseudoHeaders.contains(string_header_name))) {
       // This is an unrecognized pseudo header, reject the request
       status = HeaderValidator::RequestHeaderMapValidationResult::Reject;
     } else if (validateRequestHeaderEntry(header_name, header_value) ==
@@ -239,7 +248,7 @@ Http1HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
   }
 
   //
-  // Step 2: Verify each request header
+  // Step 2: Verify each response header
   //
   auto status = HeaderValidator::ResponseHeaderMapValidationResult::Accept;
   header_map.iterate([this, &status](const ::Envoy::Http::HeaderEntry& header_entry)
@@ -248,8 +257,9 @@ Http1HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
     const auto& header_value = header_entry.value();
     const auto& string_header_name = header_name.getStringView();
 
-    if (string_header_name.at(0) == ':' &&
-        !kAllowedPseudoHeaders.contains(header_name.getStringView())) {
+    if (string_header_name.empty() ||
+        (string_header_name.at(0) == ':' &&
+         !kAllowedPseudoHeaders.contains(header_name.getStringView()))) {
       // This is an unrecognized pseudo header, reject the response
       status = HeaderValidator::ResponseHeaderMapValidationResult::Reject;
     } else if (validateResponseHeaderEntry(header_name, header_value) ==
