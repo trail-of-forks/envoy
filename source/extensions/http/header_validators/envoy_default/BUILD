@@ -13,12 +13,14 @@ envoy_cc_library(
     name = "header_validator",
     srcs = [
         "header_validator_factory.cc",
+        "http1_header_validator.cc",
         "http2_header_validator.cc",
         "http_header_validator.cc",
         "null_header_validator.cc",
     ],
     hdrs = [
         "header_validator_factory.h",
+        "http1_header_validator.h",
         "http2_header_validator.h",
         "http_header_validator.h",
         "nghttp2_character_maps.h",
@@ -27,6 +29,7 @@ envoy_cc_library(
     deps = [
         "//envoy/http:header_validator_interface",
         "//external:abseil_node_hash_set",
+        "//source/common/http:headers_lib",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],
 )
