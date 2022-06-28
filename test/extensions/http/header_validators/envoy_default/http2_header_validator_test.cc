@@ -15,8 +15,12 @@ using ::Envoy::Http::HeaderValidator;
 
 class Http2HeaderValidatorTest : public HeaderValidatorTest {
 protected:
-  ::Envoy::Http::HeaderValidatorPtr createH2(absl::string_view config_yaml) {
-    return create(config_yaml, ::Envoy::Http::HeaderValidatorFactory::Protocol::HTTP2);
+  Http2HeaderValidatorPtr createH2(absl::string_view config_yaml) {
+    envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
+        typed_config;
+    TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
+
+    return std::make_unique<Http2HeaderValidator>(typed_config, stream_info_);
   }
 };
 
@@ -128,44 +132,13 @@ TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderMapInvalidStatus) {
             HeaderValidator::ResponseHeaderMapValidationResult::Reject);
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidateMethod) {
-  HeaderString get{"GET"};
-  HeaderString custom{"CUSTOM-METHOD"};
-  EXPECT_EQ(Http2HeaderValidator::validateMethodPseudoHeaderValue(get),
-            HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(Http2HeaderValidator::validateMethodPseudoHeaderValue(custom),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
-}
-
 TEST_F(Http2HeaderValidatorTest, ValidateTransferEncoding) {
   HeaderString trailers{"trailers"};
   HeaderString chunked{"chunked"};
-  EXPECT_EQ(Http2HeaderValidator::validateTransferEncodingHeaderValue(trailers),
+  auto uhv = createH2(empty_config);
+  EXPECT_EQ(uhv->validateTransferEncodingHeader(trailers),
             HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(Http2HeaderValidator::validateTransferEncodingHeaderValue(chunked),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateSchemeStrict) {
-  auto mode = Http2HeaderValidator::SchemaPseudoHeaderValidationMode::Strict;
-  HeaderString valid{"https"};
-  HeaderString invalid_first{"Https"};
-  HeaderString invalid_middle{"http+Ssh"};
-  EXPECT_EQ(Http2HeaderValidator::validateSchemePseudoHeaderValue(mode, valid),
-            HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(Http2HeaderValidator::validateSchemePseudoHeaderValue(mode, invalid_first),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
-  EXPECT_EQ(Http2HeaderValidator::validateSchemePseudoHeaderValue(mode, invalid_middle),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateSchemeUppercase) {
-  auto mode = Http2HeaderValidator::SchemaPseudoHeaderValidationMode::AllowUppercase;
-  HeaderString valid{"HTTPS"};
-  HeaderString invalid_middle{"http_ssh"};
-  EXPECT_EQ(Http2HeaderValidator::validateSchemePseudoHeaderValue(mode, valid),
-            HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(Http2HeaderValidator::validateSchemePseudoHeaderValue(mode, invalid_middle),
+  EXPECT_EQ(uhv->validateTransferEncodingHeader(chunked),
             HeaderValidator::HeaderEntryValidationResult::Reject);
 }
 
@@ -178,136 +151,98 @@ TEST_F(Http2HeaderValidatorTest, ValidateAuthority) {
   HeaderString invalid_port_trailer{"envoy.com:10a"};
   HeaderString invalid_port_value{"envoy.com:66000"};
   HeaderString invalid_port_0{"envoy.com:0"};
+  auto uhv = createH2(empty_config);
 
-  EXPECT_EQ(Http2HeaderValidator::validateAuthorityPseudoHeaderValue(valid),
+  EXPECT_EQ(uhv->validateAuthorityHeader(valid),
             HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(Http2HeaderValidator::validateAuthorityPseudoHeaderValue(valid_no_port),
+  EXPECT_EQ(uhv->validateAuthorityHeader(valid_no_port),
             HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(Http2HeaderValidator::validateAuthorityPseudoHeaderValue(invalid_empty),
+  EXPECT_EQ(uhv->validateAuthorityHeader(invalid_empty),
             HeaderValidator::HeaderEntryValidationResult::Reject);
-  EXPECT_EQ(Http2HeaderValidator::validateAuthorityPseudoHeaderValue(invalid_userinfo),
+  EXPECT_EQ(uhv->validateAuthorityHeader(invalid_userinfo),
             HeaderValidator::HeaderEntryValidationResult::Reject);
-  EXPECT_EQ(Http2HeaderValidator::validateAuthorityPseudoHeaderValue(invalid_port_int),
+  EXPECT_EQ(uhv->validateAuthorityHeader(invalid_port_int),
             HeaderValidator::HeaderEntryValidationResult::Reject);
-  EXPECT_EQ(Http2HeaderValidator::validateAuthorityPseudoHeaderValue(invalid_port_trailer),
+  EXPECT_EQ(uhv->validateAuthorityHeader(invalid_port_trailer),
             HeaderValidator::HeaderEntryValidationResult::Reject);
-  EXPECT_EQ(Http2HeaderValidator::validateAuthorityPseudoHeaderValue(invalid_port_value),
+  EXPECT_EQ(uhv->validateAuthorityHeader(invalid_port_value),
             HeaderValidator::HeaderEntryValidationResult::Reject);
-  EXPECT_EQ(Http2HeaderValidator::validateAuthorityPseudoHeaderValue(invalid_port_0),
+  EXPECT_EQ(uhv->validateAuthorityHeader(invalid_port_0),
             HeaderValidator::HeaderEntryValidationResult::Reject);
 }
-
-TEST_F(Http2HeaderValidatorTest, ValidateResponseStatusNone) {
-  auto mode = Http2HeaderValidator::StatusPseudoHeaderValidationMode::None;
-  HeaderString valid{"200"};
-  HeaderString valid_outside_of_range{"1024"};
-  HeaderString invalid{"asdf"};
-
-  EXPECT_EQ(Http2HeaderValidator::validateStatusPseudoHeaderValue(mode, valid),
-            HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(Http2HeaderValidator::validateStatusPseudoHeaderValue(mode, valid_outside_of_range),
-            HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(Http2HeaderValidator::validateStatusPseudoHeaderValue(mode, invalid),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateResponseStatusRange) {
-  auto mode = Http2HeaderValidator::StatusPseudoHeaderValidationMode::ValueRange;
-  HeaderString valid{"200"};
-  HeaderString invalid_max{"1024"};
-  HeaderString invalid_min{"99"};
-
-  EXPECT_EQ(Http2HeaderValidator::validateStatusPseudoHeaderValue(mode, valid),
-            HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(Http2HeaderValidator::validateStatusPseudoHeaderValue(mode, invalid_max),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
-  EXPECT_EQ(Http2HeaderValidator::validateStatusPseudoHeaderValue(mode, invalid_min),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
-}
-
-// TODO(meilya) should we test validating response status with AllowKnownValues and Strict modes?
-// this may be out of scope.
 
 TEST_F(Http2HeaderValidatorTest, ValidatePath) {
   HeaderString valid{"/"};
+  auto uhv = createH2(empty_config);
   // TODO(meilya) - after path normalization has been approved and implemented
-  EXPECT_EQ(Http2HeaderValidator::validatePathPseudoHeaderValue(valid),
-            HeaderValidator::HeaderEntryValidationResult::Accept);
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyRejectUnderscores) {
-  auto mode = Http2HeaderValidator::GenericHeaderNameValidationMode::RejectUnderscores;
-  HeaderString valid{"x-foo"};
-  HeaderString invalid_underscore{"x_foo"};
-  HeaderString invalid_eascii{"x-foo\x80"};
-
-  EXPECT_EQ(Http2HeaderValidator::validateGenericHeaderKey(mode, valid),
-            HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(Http2HeaderValidator::validateGenericHeaderKey(mode, invalid_underscore),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
-  EXPECT_EQ(Http2HeaderValidator::validateGenericHeaderKey(mode, invalid_eascii),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyStrict) {
-  auto mode = Http2HeaderValidator::GenericHeaderNameValidationMode::Strict;
-  HeaderString valid{"x-foo"};
-  HeaderString valid_underscore{"x_foo"};
-  HeaderString invalid_eascii{"x-foo\x80"};
-  HeaderString invalid_empty{""};
-
-  EXPECT_EQ(Http2HeaderValidator::validateGenericHeaderKey(mode, valid),
-            HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(Http2HeaderValidator::validateGenericHeaderKey(mode, valid_underscore),
-            HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(Http2HeaderValidator::validateGenericHeaderKey(mode, invalid_eascii),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
-  EXPECT_EQ(Http2HeaderValidator::validateGenericHeaderKey(mode, invalid_empty),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(uhv->validatePathHeader(valid), HeaderValidator::HeaderEntryValidationResult::Accept);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyConnectionRejected) {
-  auto mode = Http2HeaderValidator::GenericHeaderNameValidationMode::Strict;
   HeaderString transfer_encoding{"transfer-encoding"};
   HeaderString connection{"connection"};
   HeaderString keep_alive{"keep-alive"};
   HeaderString upgrade{"upgrade"};
   HeaderString proxy_connection{"proxy-connection"};
+  auto uhv = createH2(empty_config);
 
-  EXPECT_EQ(Http2HeaderValidator::validateGenericHeaderKey(mode, transfer_encoding),
+  EXPECT_EQ(uhv->validateGenericHeaderName(transfer_encoding),
             HeaderValidator::HeaderEntryValidationResult::Reject);
-  EXPECT_EQ(Http2HeaderValidator::validateGenericHeaderKey(mode, connection),
+  EXPECT_EQ(uhv->validateGenericHeaderName(connection),
             HeaderValidator::HeaderEntryValidationResult::Reject);
-  EXPECT_EQ(Http2HeaderValidator::validateGenericHeaderKey(mode, keep_alive),
+  EXPECT_EQ(uhv->validateGenericHeaderName(keep_alive),
             HeaderValidator::HeaderEntryValidationResult::Reject);
-  EXPECT_EQ(Http2HeaderValidator::validateGenericHeaderKey(mode, upgrade),
+  EXPECT_EQ(uhv->validateGenericHeaderName(upgrade),
             HeaderValidator::HeaderEntryValidationResult::Reject);
-  EXPECT_EQ(Http2HeaderValidator::validateGenericHeaderKey(mode, proxy_connection),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderValue) {
-  HeaderString valid{"hello world"};
-  HeaderString valid_eascii{"value\x80"};
-  HeaderString invalid_newline;
-
-  setHeaderStringUnvalidated(invalid_newline, "hello\nworld");
-
-  EXPECT_EQ(Http2HeaderValidator::validateGenericHeaderValue(valid),
-            HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(Http2HeaderValidator::validateGenericHeaderValue(valid_eascii),
-            HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(Http2HeaderValidator::validateGenericHeaderValue(invalid_newline),
+  EXPECT_EQ(uhv->validateGenericHeaderName(proxy_connection),
             HeaderValidator::HeaderEntryValidationResult::Reject);
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidateContentLength) {
-  HeaderString valid{"100"};
-  HeaderString invalid{"10a2"};
+/* TODO(meilya) - add generic header name validation here */
 
-  EXPECT_EQ(Http2HeaderValidator::validateContentLength(valid),
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderAuthority) {
+  HeaderString authority{":authority"};
+  HeaderString valid{"envoy.com"};
+  HeaderString invalid{"user:pass@envoy.com"};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(authority, valid),
             HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(Http2HeaderValidator::validateContentLength(invalid),
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(authority, invalid),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderAuthorityHost) {
+  HeaderString host{"host"};
+  HeaderString valid{"envoy.com"};
+  HeaderString invalid{"user:pass@envoy.com"};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(host, valid),
+            HeaderValidator::HeaderEntryValidationResult::Accept);
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(host, invalid),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderPath) {
+  HeaderString path{":path"};
+  HeaderString valid{"/"};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(path, valid),
+            HeaderValidator::HeaderEntryValidationResult::Accept);
+  // TODO(meilya) - add invalid case when path normalization is ready
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderTransferEncoding) {
+  HeaderString transfer_encoding{"TE"};
+  HeaderString valid{"trailers"};
+  HeaderString invalid{"chunked"};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(transfer_encoding, valid),
+            HeaderValidator::HeaderEntryValidationResult::Accept);
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(transfer_encoding, invalid),
             HeaderValidator::HeaderEntryValidationResult::Reject);
 }
 
@@ -335,30 +270,6 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMethodRestrictMethods) {
             HeaderValidator::HeaderEntryValidationResult::Reject);
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderAuthority) {
-  HeaderString authority{":authority"};
-  HeaderString valid{"envoy.com"};
-  HeaderString invalid{"user:pass@envoy.com"};
-  auto uhv = createH2(empty_config);
-
-  EXPECT_EQ(uhv->validateRequestHeaderEntry(authority, valid),
-            HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(uhv->validateRequestHeaderEntry(authority, invalid),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderAuthorityHost) {
-  HeaderString host{"host"};
-  HeaderString valid{"envoy.com"};
-  HeaderString invalid{"user:pass@envoy.com"};
-  auto uhv = createH2(empty_config);
-
-  EXPECT_EQ(uhv->validateRequestHeaderEntry(host, valid),
-            HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(uhv->validateRequestHeaderEntry(host, invalid),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
-}
-
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderContentLength) {
   HeaderString content_length{"content-length"};
   HeaderString valid{"100"};
@@ -380,28 +291,6 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderScheme) {
   EXPECT_EQ(uhv->validateRequestHeaderEntry(scheme, valid),
             HeaderValidator::HeaderEntryValidationResult::Accept);
   EXPECT_EQ(uhv->validateRequestHeaderEntry(scheme, invalid),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderPath) {
-  HeaderString path{":path"};
-  HeaderString valid{"/"};
-  auto uhv = createH2(empty_config);
-
-  EXPECT_EQ(uhv->validateRequestHeaderEntry(path, valid),
-            HeaderValidator::HeaderEntryValidationResult::Accept);
-  // TODO(meilya) - add invalid case when path normalization is ready
-}
-
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderTransferEncoding) {
-  HeaderString transfer_encoding{"TE"};
-  HeaderString valid{"trailers"};
-  HeaderString invalid{"chunked"};
-  auto uhv = createH2(empty_config);
-
-  EXPECT_EQ(uhv->validateRequestHeaderEntry(transfer_encoding, valid),
-            HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(uhv->validateRequestHeaderEntry(transfer_encoding, invalid),
             HeaderValidator::HeaderEntryValidationResult::Reject);
 }
 
