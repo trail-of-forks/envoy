@@ -16,23 +16,59 @@ public:
           config,
       StreamInfo::StreamInfo& stream_info);
 
-  HeaderEntryValidationResult
-  validateRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
-                             const ::Envoy::Http::HeaderString& value) override;
+  // Validates the given method pseudo header value
+  virtual HeaderEntryValidationResult
+  validateMethodHeader(const ::Envoy::Http::HeaderString& value);
 
-  HeaderEntryValidationResult
-  validateResponseHeaderEntry(const ::Envoy::Http::HeaderString& key,
-                              const ::Envoy::Http::HeaderString& value) override;
+  // Configuration for validateStatusPseudoHeaderValue
+  enum class StatusPseudoHeaderValidationMode {
+    // No validation, just make sure it's numeric
+    None,
 
-  RequestHeaderMapValidationResult
-  validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& header_map) override;
+    // Only accept values in the following range: 100->599
+    ValueRange,
 
-  ResponseHeaderMapValidationResult
-  validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) override;
+    // Allows all known codes
+    AllowKnownValues,
+
+    // Only allows standard codes
+    Strict,
+  };
+
+  // Validates the given status pseudo header value
+  virtual HeaderEntryValidationResult
+  validateStatusHeader(const StatusPseudoHeaderValidationMode& mode,
+                       const ::Envoy::Http::HeaderString& value);
+
+  // Validates the given header key. Used when a more specific validator is not available
+  virtual HeaderEntryValidationResult
+  validateGenericHeaderName(const ::Envoy::Http::HeaderString& name);
+
+  // Validates the given header value. Used when a more specific validator is not available
+  virtual HeaderEntryValidationResult
+  validateGenericHeaderValue(const ::Envoy::Http::HeaderString& value);
+
+  // Validate the content-length header as whole-number integer.
+  virtual HeaderEntryValidationResult
+  validateContentLengthHeader(const ::Envoy::Http::HeaderString& value);
+
+  // Configuration for validateSchemePseudoHeaderValue
+  enum class SchemePseudoHeaderValidationMode {
+    // Strict
+    Strict,
+
+    // Like strict, but allow uppercase characters
+    AllowUppercase,
+  };
+
+  // Validates the given scheme pseudo header value
+  virtual HeaderEntryValidationResult
+  validateSchemeHeader(const SchemePseudoHeaderValidationMode& mode,
+                       const ::Envoy::Http::HeaderString& value);
 
 private:
   // Configuration
-  const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
+  const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;
 };
 
