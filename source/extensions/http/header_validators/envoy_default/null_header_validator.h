@@ -31,6 +31,8 @@ public:
   validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) override;
 };
 
+using NullHeaderValidatorPtr = std::unique_ptr<NullHeaderValidator>;
+
 } // namespace EnvoyDefault
 } // namespace HeaderValidators
 } // namespace Http
