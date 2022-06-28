@@ -1,7 +1,7 @@
 #include "source/extensions/http/header_validators/envoy_default/header_validator_factory.h"
 
+#include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 #include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
-#include "source/extensions/http/header_validators/envoy_default/http_header_validator.h"
 #include "source/extensions/http/header_validators/envoy_default/null_header_validator.h"
 
 namespace Envoy {
@@ -19,20 +19,15 @@ HeaderValidatorFactory::HeaderValidatorFactory(const HeaderValidatorConfig& conf
 ::Envoy::Http::HeaderValidatorPtr
 HeaderValidatorFactory::create(::Envoy::Http::HeaderValidatorFactory::Protocol protocol,
                                StreamInfo::StreamInfo& stream_info) {
-
-  ::Envoy::Http::HeaderValidatorPtr validator;
-
-  if (protocol == ::Envoy::Http::HeaderValidatorFactory::Protocol::HTTP2) {
-    validator = std::make_unique<Http2HeaderValidator>(config_, stream_info);
-
-  } else if (protocol == ::Envoy::Http::HeaderValidatorFactory::Protocol::HTTP1) {
-    validator = std::make_unique<HttpHeaderValidator>(config_, stream_info);
-
-  } else {
-    validator = std::make_unique<NullHeaderValidator>(config_, stream_info);
+  switch (protocol) {
+  case ::Envoy::Http::HeaderValidatorFactory::Protocol::HTTP2:
+    return std::make_unique<Http2HeaderValidator>(config_, stream_info);
+  case ::Envoy::Http::HeaderValidatorFactory::Protocol::HTTP1:
+  case ::Envoy::Http::HeaderValidatorFactory::Protocol::HTTP09:
+    return std::make_unique<Http1HeaderValidator>(config_, stream_info);
+  default:
+    return std::make_unique<NullHeaderValidator>(config_, stream_info);
   }
-
-  return validator;
 }
 
 } // namespace EnvoyDefault
