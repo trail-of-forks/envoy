@@ -11,6 +11,10 @@ namespace Http {
 namespace HeaderValidators {
 namespace EnvoyDefault {
 
+/*
+ * Base class for all HTTP codec header validations. This class has several methods to validate
+ * headers that are shared across multiple codec versions where the RFC guidance did not change.
+ */
 class HttpHeaderValidator : public ::Envoy::Http::HeaderValidator {
 public:
   HttpHeaderValidator(
@@ -18,62 +22,80 @@ public:
           config,
       StreamInfo::StreamInfo& stream_info);
 
-  // Validates the given method pseudo header value
+  /*
+   * Validate the :method pseudo header, honoring the restrict_http_methods configuration option.
+   */
   virtual HeaderEntryValidationResult
   validateMethodHeader(const ::Envoy::Http::HeaderString& value);
 
-  // Configuration for validateStatusPseudoHeaderValue
+  /*
+   * Configuration for validateStatusHeader method.
+   */
   enum class StatusPseudoHeaderValidationMode {
-    // No validation, just make sure it's numeric
-    None,
+    // Only accept whole number integer values.
+    WholeNumber,
 
-    // Only accept values in the following range: 100->599
+    // Only accept values in the following range: 100 <= status <= 599.
     ValueRange,
 
-    // Allows all known codes
-    AllowKnownValues,
-
-    // Only allows standard codes
-    Strict,
+    // Only accept RFC registered status codes:
+    // https://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml.
+    OfficialStatusCodes,
   };
 
-  // Validates the given status pseudo header value
+  /*
+   * Validate the :status response pseudo header.
+   */
   virtual HeaderEntryValidationResult
   validateStatusHeader(const StatusPseudoHeaderValidationMode& mode,
                        const ::Envoy::Http::HeaderString& value);
 
-  // Validates the given header key. Used when a more specific validator is not available
+  /*
+   * Validate any request or response header name.
+   */
   virtual HeaderEntryValidationResult
   validateGenericHeaderName(const ::Envoy::Http::HeaderString& name);
 
-  // Validates the given header value. Used when a more specific validator is not available
+  /*
+   * Validate any request or response header value.
+   */
   virtual HeaderEntryValidationResult
   validateGenericHeaderValue(const ::Envoy::Http::HeaderString& value);
 
-  // Validate the content-length header as whole-number integer.
+  /*
+   * Validate the Content-Length request and response header as a whole number integer.
+   */
   virtual HeaderEntryValidationResult
   validateContentLengthHeader(const ::Envoy::Http::HeaderString& value);
 
-  // Configuration for validateSchemePseudoHeaderValue
+  /*
+   * Configuration for the validateSchemeHeader method.
+   */
   enum class SchemePseudoHeaderValidationMode {
-    // Strict
+    // Strict - value must be lowercase and match RFC allowed characters
     Strict,
 
     // Like strict, but allow uppercase characters
     AllowUppercase,
   };
 
-  // Validates the given scheme pseudo header value
+  /*
+   * Validate the :scheme pseudo header.
+   */
   virtual HeaderEntryValidationResult
   validateSchemeHeader(const SchemePseudoHeaderValidationMode& mode,
                        const ::Envoy::Http::HeaderString& value);
 
+  /*
+   * Validate the host or :authority pseudo header.
+   */
   virtual HeaderEntryValidationResult validateHostHeader(const ::Envoy::Http::HeaderString& value);
 
 protected:
   // Configuration
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;
+  // Helper header value constants
   const ::Envoy::Http::HeaderValues& header_values_;
 };
 

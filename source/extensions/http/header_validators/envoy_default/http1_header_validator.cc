@@ -13,14 +13,15 @@ using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderVal
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::HeaderValidator;
 
-//
-// Header validation implementation for the Http/1 codec. This class follows guidance from
-// several RFCS:
-//
-// RFC 3986 <https://datatracker.ietf.org/doc/html/rfc3986> URI Generic Syntax
-// RFC 7230 <https://datatracker.ietf.org/doc/html/rfc7230> HTTP/1.1 Message Syntax
-// RFC 7231 <https://datatracker.ietf.org/doc/html/rfc7231> HTTP/1.1 Semantics and Content
-//
+/*
+ * Header validation implementation for the Http/1 codec. This class follows guidance from
+ * several RFCS:
+ *
+ * RFC 3986 <https://datatracker.ietf.org/doc/html/rfc3986> URI Generic Syntax
+ * RFC 7230 <https://datatracker.ietf.org/doc/html/rfc7230> HTTP/1.1 Message Syntax
+ * RFC 7231 <https://datatracker.ietf.org/doc/html/rfc7231> HTTP/1.1 Semantics and Content
+ *
+ */
 Http1HeaderValidator::Http1HeaderValidator(const HeaderValidatorConfig& config,
                                            StreamInfo::StreamInfo& stream_info)
     : HttpHeaderValidator(config, stream_info) {}
@@ -36,9 +37,9 @@ Http1HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
   }
 
   if (key_string_view == ":method") {
-    // Verify that the :method matches a well known value if the configuration is set to
-    // restrict methods. When not restricting methods, the generic validation will validate
-    // the :method value.
+    // Verify that the :method matches a well known value if the configuration is set to restrict
+    // methods. When not restricting methods, the generic validation will validate the :method
+    // value.
     return validateMethodHeader(value);
   } else if (key_string_view == ":authority" || key_string_view == "host") {
     // Validate the :authority or legacy host header
@@ -77,9 +78,13 @@ Http1HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
   }
 
   if (key_string_view == ":status") {
-    // Validate the :status header against the RFC valid range (100 <= status < 600)
+    // Validate the :status header against the RFC valid range (100 <= status <= 599)
     return validateStatusHeader(StatusPseudoHeaderValidationMode::ValueRange, value);
+  } else if (key_string_view == "content-length") {
+    // Validate the Content-Length header
+    return validateContentLengthHeader(value);
   } else if (key_string_view.at(0) != ':') {
+    // Validate the generic header name.
     auto name_result = validateGenericHeaderName(key);
     if (name_result == HeaderValidator::HeaderEntryValidationResult::Reject) {
       return name_result;
@@ -94,10 +99,9 @@ HeaderValidator::RequestHeaderMapValidationResult
 Http1HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& header_map) {
   static const absl::node_hash_set<absl::string_view> kAllowedPseudoHeaders = {
       ":method", ":scheme", ":authority", ":path"};
-
   //
-  // Step 1: verify that required pseudo headers are present HTTP/1.1 requests requries
-  // the :method and :path headers based on RFC 7230
+  // Step 1: verify that required pseudo headers are present. HTTP/1.1 requests requries the
+  // :method and :path headers based on RFC 7230
   // https://datatracker.ietf.org/doc/html/rfc7230#section-3.1.1:
   //
   // request-line   = method SP request-target SP HTTP-version CRLF
@@ -202,12 +206,10 @@ Http1HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     }
   }
 
-  // Finally, make sure this request only contains allowed headers
-  auto status = HeaderValidator::RequestHeaderMapValidationResult::Accept;
-
   //
   // Step 2: Verify each request header
   //
+  auto status = HeaderValidator::RequestHeaderMapValidationResult::Accept;
   header_map.iterate([this, &status](const ::Envoy::Http::HeaderEntry& header_entry)
                          -> ::Envoy::Http::HeaderMap::Iterate {
     const auto& header_name = header_entry.key();

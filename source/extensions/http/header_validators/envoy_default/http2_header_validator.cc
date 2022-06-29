@@ -13,15 +13,16 @@ using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderVal
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::HeaderValidator;
 
-//
-// Header validation implementation for the Http/2 codec. This class follows guidance from
-// several RFCS:
-//
-// RFC 3986 <https://datatracker.ietf.org/doc/html/rfc3986> URI Generic Syntax
-// RFC 7230 <https://datatracker.ietf.org/doc/html/rfc7230> HTTP/1.1 Message Syntax
-// RFC 7231 <https://datatracker.ietf.org/doc/html/rfc7231> HTTP/1.1 Semantics and Content
-// RFC 7540 <https://datatracker.ietf.org/doc/html/rfc7540> HTTP/2
-//
+/*
+ * Header validation implementation for the Http/2 codec. This class follows guidance from
+ * several RFCS:
+ *
+ * RFC 3986 <https://datatracker.ietf.org/doc/html/rfc3986> URI Generic Syntax
+ * RFC 7230 <https://datatracker.ietf.org/doc/html/rfc7230> HTTP/1.1 Message Syntax
+ * RFC 7231 <https://datatracker.ietf.org/doc/html/rfc7231> HTTP/1.1 Semantics and Content
+ * RFC 7540 <https://datatracker.ietf.org/doc/html/rfc7540> HTTP/2
+ *
+ */
 Http2HeaderValidator::Http2HeaderValidator(const HeaderValidatorConfig& config,
                                            StreamInfo::StreamInfo& stream_info)
     : HttpHeaderValidator(config, stream_info) {}
@@ -37,9 +38,9 @@ Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
   }
 
   if (key_string_view == ":method") {
-    // Verify that the :method matches a well own value if the configuration is set to
-    // restrict methods. When not restricting methods, the generic validation will validate
-    // the :method value.
+    // Verify that the :method matches a well own value if the configuration is set to restrict
+    // methods. When not restricting methods, the generic validation will validate the :method
+    // value.
     return validateMethodHeader(value);
   } else if (key_string_view == ":authority" || key_string_view == "host") {
     // Validate the :authority or legacy host header
@@ -80,6 +81,9 @@ Http2HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
   if (key_string_view == ":status") {
     // Validate the :status header against the RFC valid range (100 <= status < 600)
     return validateStatusHeader(StatusPseudoHeaderValidationMode::ValueRange, value);
+  } else if (key_string_view == "content-length") {
+    // Validate the Content-Length header
+    return validateContentLengthHeader(value);
   } else if (key_string_view.at(0) != ':') {
     auto name_result = validateGenericHeaderName(key);
     if (name_result == HeaderValidator::HeaderEntryValidationResult::Reject) {
@@ -102,7 +106,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
       ":method", ":scheme", ":authority", ":path"};
 
   //
-  // Step 1: verify that required pseudo headers are present
+  // Step 1: verify that required pseudo headers are present.
   //
   // The method pseudo header is always mandatory.
   //
@@ -124,14 +128,13 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     return HeaderValidator::RequestHeaderMapValidationResult::Reject;
   }
 
-  // Finally, make sure this request only contains allowed headers
+  //
+  // Step 2: Verify each request header
+  //
   const auto& allowed_headers =
       is_connect_method ? kAllowedPseudoHeadersForConnect : kAllowedPseudoHeaders;
   auto status = HeaderValidator::RequestHeaderMapValidationResult::Accept;
 
-  //
-  // Step 2: Verify each request header
-  //
   header_map.iterate(
       [this, &status, &allowed_headers](
           const ::Envoy::Http::HeaderEntry& header_entry) -> ::Envoy::Http::HeaderMap::Iterate {
@@ -159,19 +162,22 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
 HeaderValidator::ResponseHeaderMapValidationResult
 Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) {
   static const absl::node_hash_set<absl::string_view> kAllowedPseudoHeaders = {":status"};
-
   //
   // Step 1: verify that required pseudo headers are present
   //
   // For HTTP/2 responses, RFC 7540 states that only the :status
-  // header is required: https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.4
+  // header is required: https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.4:
+  //
+  // For HTTP/2 responses, a single ":status" pseudo-header field is defined that carries the HTTP
+  // status code field (see [RFC7231], Section 6). This pseudo-header field MUST be included in
+  // all responses; otherwise, the response is malformed.
   //
   if (header_map.getStatusValue().empty()) {
     return HeaderValidator::ResponseHeaderMapValidationResult::Reject;
   }
 
   //
-  // Step 2: Verify each request header
+  // Step 2: Verify each response header
   //
   auto status = HeaderValidator::ResponseHeaderMapValidationResult::Accept;
   header_map.iterate([this, &status](const ::Envoy::Http::HeaderEntry& header_entry)
@@ -239,23 +245,8 @@ Http2HeaderValidator::validatePathHeader(const ::Envoy::Http::HeaderString& valu
 HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateGenericHeaderName(const ::Envoy::Http::HeaderString& key) {
   //
-  // Use the nghttp2 character map to verify that the header name is valid. This
-  // also honors the underscore in header configuration setting.
-  //
-  // From RFC 7230, https://datatracker.ietf.org/doc/html/rfc7230:
-  //
-  // header-field   = field-name ":" OWS field-value OWS
-  // field-name     = token
-  // token          = 1*tchar
-  //
-  // tchar          = "!" / "#" / "$" / "%" / "&" / "'" / "*"
-  //                / "+" / "-" / "." / "^" / "_" / "`" / "|" / "~"
-  //                / DIGIT / ALPHA
-  //                ; any VCHAR, except delimiters
-  //
-  //
-  // Also, for HTTP/2, connection-specific headers must be treated as malformed.
-  // From RFC 7540, https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.2:
+  // For HTTP/2, connection-specific headers must be treated as malformed. From RFC 7540,
+  // https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.2:
   //
   // any message containing connection-specific header fields MUST be treated
   // as malformed (Section 8.1.2.6).

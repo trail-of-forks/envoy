@@ -104,11 +104,10 @@ HttpHeaderValidator::validateSchemeHeader(const SchemePseudoHeaderValidationMode
   //
   // scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )
   //
-  // Although schemes are case-insensitive, the canonical form is lowercase and
-  // documents that specify schemes must do so with lowercase letters. An
-  // implementation should accept uppercase letters as equivalent to lowercase
-  // in scheme names (e.g., allow "HTTP" as well as "http") for the sake of
-  // robustness but should only produce lowercase scheme names for consistency.
+  // Although schemes are case-insensitive, the canonical form is lowercase and documents that
+  // specify schemes must do so with lowercase letters. An implementation should accept uppercase
+  // letters as equivalent to lowercase in scheme names (e.g., allow "HTTP" as well as "http") for
+  // the sake of robustness but should only produce lowercase scheme names for consistency.
   //
   // The validation mode controls whether uppercase letters are permitted.
   //
@@ -164,9 +163,8 @@ HttpHeaderValidator::validateStatusHeader(const StatusPseudoHeaderValidationMode
                                           const HeaderString& value) {
   //
   // This is based on RFC 7231, https://datatracker.ietf.org/doc/html/rfc7231#section-6,
-  // describing the list of response status codes.
-  //
-  // https://en.wikipedia.org/wiki/List_of_HTTP_status_codes
+  // describing the list of response status codes and the list of registered response status codes,
+  // https://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml.
   //
   static const absl::node_hash_set<std::uint32_t> kOfficialStatusCodes = {
       100, 102, 103, 200, 201, 202, 203, 204, 205, 206, 207, 208, 226, 300, 301, 302,
@@ -174,68 +172,36 @@ HttpHeaderValidator::validateStatusHeader(const StatusPseudoHeaderValidationMode
       410, 411, 412, 413, 414, 415, 416, 417, 418, 421, 422, 423, 424, 425, 426, 428,
       429, 431, 451, 500, 501, 502, 503, 504, 505, 506, 507, 508, 510, 511,
   };
-
-  static const absl::node_hash_set<std::uint32_t> kUnofficialStatusCodes = {
-      419, 420, 420, 430, 450, 498, 499, 509, 529, 530, 598, 599,
-  };
-
-  static const absl::node_hash_set<std::uint32_t> kMicrosoftIISStatusCodes = {
-      440,
-      449,
-      451,
-  };
-
-  static const absl::node_hash_set<std::uint32_t> kNginxStatusCodes = {
-      444, 494, 495, 496, 497, 499,
-  };
-
-  static const absl::node_hash_set<std::uint32_t> kCloudFlareStatusCodes = {
-      520, 521, 522, 523, 524, 525, 526, 527, 530,
-  };
-
-  static const absl::node_hash_set<std::uint32_t> kAwsElasticLoadBalancerCodes = {
-      460,
-      463,
-      561,
-  };
+  static const uint32_t kMinimumResponseStatusCode = 100;
+  static const uint32_t kMaximumResponseStatusCode = 599;
 
   const auto& value_string_view = value.getStringView();
 
   auto buffer_start = value_string_view.data();
   auto buffer_end = buffer_start + value_string_view.size();
 
+  // Convert the status to an integer.
   std::uint32_t status_value{};
   auto result = std::from_chars(buffer_start, buffer_end, status_value);
-  if (result.ec == std::errc::invalid_argument) {
+  if (result.ec == std::errc::invalid_argument || result.ptr != buffer_end) {
     return HeaderValidator::HeaderEntryValidationResult::Reject;
   }
 
   auto status{HeaderValidator::HeaderEntryValidationResult::Reject};
 
   switch (mode) {
-  case StatusPseudoHeaderValidationMode::None:
+  case StatusPseudoHeaderValidationMode::WholeNumber:
     status = HeaderValidator::HeaderEntryValidationResult::Accept;
     break;
 
   case StatusPseudoHeaderValidationMode::ValueRange:
-    if (status_value >= 100 && status_value <= 599) {
+    if (status_value >= kMinimumResponseStatusCode && status_value <= kMaximumResponseStatusCode) {
       status = HeaderValidator::HeaderEntryValidationResult::Accept;
     }
 
     break;
 
-  case StatusPseudoHeaderValidationMode::AllowKnownValues:
-    if (kOfficialStatusCodes.contains(status_value) ||
-        kUnofficialStatusCodes.contains(status_value) ||
-        kMicrosoftIISStatusCodes.contains(status_value) ||
-        kNginxStatusCodes.contains(status_value) || kCloudFlareStatusCodes.contains(status_value) ||
-        kAwsElasticLoadBalancerCodes.contains(status_value)) {
-      status = HeaderValidator::HeaderEntryValidationResult::Accept;
-    }
-
-    break;
-
-  case StatusPseudoHeaderValidationMode::Strict:
+  case StatusPseudoHeaderValidationMode::OfficialStatusCodes:
     if (kOfficialStatusCodes.contains(status_value)) {
       status = HeaderValidator::HeaderEntryValidationResult::Accept;
     }
@@ -252,8 +218,8 @@ HttpHeaderValidator::validateStatusHeader(const StatusPseudoHeaderValidationMode
 HeaderValidator::HeaderEntryValidationResult
 HttpHeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   //
-  // Use the nghttp2 character map to verify that the header name is valid. This
-  // also honors the underscore in header configuration setting.
+  // Use the nghttp2 character map to verify that the header name is valid. This also honors the
+  // underscore in header configuration setting.
   //
   // From RFC 7230, https://datatracker.ietf.org/doc/html/rfc7230:
   //
@@ -266,17 +232,10 @@ HttpHeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   //                / DIGIT / ALPHA
   //                ; any VCHAR, except delimiters
   //
-  //
-  // Also, for HTTP/2, connection-specific headers must be treated as malformed.
-  // From RFC 7540, https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.2:
-  //
-  // any message containing connection-specific header fields MUST be treated
-  // as malformed (Section 8.1.2.6).
-  //
   const auto& key_string_view = name.getStringView();
   bool allow_underscores = !config_.reject_headers_with_underscores();
-  // This header name is initially invalid if the name is empty or if the name
-  // matches an incompatible connection-specific header.
+  // This header name is initially invalid if the name is empty or if the name matches an
+  // incompatible connection-specific header.
   bool is_valid = key_string_view.size() > 0;
 
   for (std::size_t i{0}; i < key_string_view.size() && is_valid; ++i) {

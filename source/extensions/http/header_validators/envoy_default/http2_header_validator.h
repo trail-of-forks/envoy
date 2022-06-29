@@ -29,17 +29,22 @@ public:
   ResponseHeaderMapValidationResult
   validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) override;
 
-  // Validates the given transfer encoding header value
+  /*
+   * Valdiate the TE header.
+   */
   HeaderEntryValidationResult validateTEHeader(const ::Envoy::Http::HeaderString& value);
 
-  // Validates the given authority pseudo header value
+  /*
+   * Validate the :authority pseudo header.
+   */
   HeaderEntryValidationResult validateAuthorityHeader(const ::Envoy::Http::HeaderString& value);
 
-  // Validates the given header key. Used when a more specific validator is not available
   virtual HeaderEntryValidationResult
   validateGenericHeaderName(const ::Envoy::Http::HeaderString& name) override;
 
-  // Validates the given path pseudo header value
+  /*
+   * Validate the :path pseudo header.
+   */
   HeaderEntryValidationResult validatePathHeader(const ::Envoy::Http::HeaderString& value);
 };
 

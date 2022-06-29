@@ -29,11 +29,15 @@ public:
   ResponseHeaderMapValidationResult
   validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) override;
 
-  // Validates the given transfer encoding header value
+  /*
+   * Validate the Transfer-Encoding header.
+   */
   HeaderEntryValidationResult
   validateTransferEncodingHeader(const ::Envoy::Http::HeaderString& value);
 
-  // Validates the given path pseudo header value
+  /*
+   * Validate the :path pseudo header.
+   */
   HeaderEntryValidationResult validatePathHeader(const ::Envoy::Http::HeaderString& value);
 };
 
