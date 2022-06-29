@@ -100,7 +100,7 @@ TEST_F(BaseHeaderValidatorTest, ValidateSchemeUppercase) {
 }
 
 TEST_F(BaseHeaderValidatorTest, ValidateResponseStatusNone) {
-  auto mode = HttpHeaderValidator::StatusPseudoHeaderValidationMode::None;
+  auto mode = HttpHeaderValidator::StatusPseudoHeaderValidationMode::WholeNumber;
   HeaderString valid{"200"};
   HeaderString valid_outside_of_range{"1024"};
   HeaderString invalid{"asdf"};
@@ -129,8 +129,17 @@ TEST_F(BaseHeaderValidatorTest, ValidateResponseStatusRange) {
             HeaderValidator::HeaderEntryValidationResult::Reject);
 }
 
-// TODO(meilya) should we test validating response status with AllowKnownValues and Strict modes?
-// this may be out of scope.
+TEST_F(BaseHeaderValidatorTest, ValidateResponseStatusOfficalCodes) {
+  auto mode = HttpHeaderValidator::StatusPseudoHeaderValidationMode::OfficialStatusCodes;
+  HeaderString valid{"200"};
+  HeaderString invalid_unregistered{"420"};
+  auto uhv = createBase(empty_config);
+
+  EXPECT_EQ(uhv->validateStatusHeader(mode, valid),
+            HeaderValidator::HeaderEntryValidationResult::Accept);
+  EXPECT_EQ(uhv->validateStatusHeader(mode, invalid_unregistered),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+}
 
 TEST_F(BaseHeaderValidatorTest, ValidateGenericHeaderKeyRejectUnderscores) {
   HeaderString valid{"x-foo"};
