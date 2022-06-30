@@ -68,6 +68,10 @@ public:
   validateSchemeHeader(const SchemePseudoHeaderValidationMode& mode,
                        const ::Envoy::Http::HeaderString& value);
 
+  // Validates the :scheme header, ignoring case
+  HeaderEntryValidationResult
+  validateSchemeHeaderCaseInsensitive(const ::Envoy::Http::HeaderString& value);
+
   virtual HeaderEntryValidationResult validateHostHeader(const ::Envoy::Http::HeaderString& value);
 
 protected:

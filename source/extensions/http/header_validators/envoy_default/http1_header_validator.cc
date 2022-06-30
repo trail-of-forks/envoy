@@ -30,7 +30,7 @@ Http1HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
                                                  const HeaderString& value) {
   const auto& key_string_view = key.getStringView();
 
-  if (!key_string_view.size()) {
+  if (key_string_view.empty()) {
     // reject empty header names
     return HeaderValidator::HeaderEntryValidationResult::Reject;
   }
@@ -71,7 +71,7 @@ HeaderValidator::HeaderEntryValidationResult
 Http1HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
                                                   const HeaderString& value) {
   const auto& key_string_view = key.getStringView();
-  if (!key_string_view.size()) {
+  if (key_string_view.empty()) {
     // reject empty header names
     return HeaderValidator::HeaderEntryValidationResult::Reject;
   }

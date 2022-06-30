@@ -84,7 +84,7 @@ HttpHeaderValidator::validateMethodHeader(const HeaderString& value) {
   if (config_.restrict_http_methods()) {
     is_valid = kHttpMethodRegistry.contains(method);
   } else {
-    is_valid = method.size() > 0;
+    is_valid = !method.empty();
     for (std::size_t i = 0; i < method.size() && is_valid; ++i) {
       char c = method[i];
       is_valid = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
@@ -157,6 +157,13 @@ HttpHeaderValidator::validateSchemeHeader(const SchemePseudoHeaderValidationMode
   }
 
   return HeaderValidator::HeaderEntryValidationResult::Accept;
+}
+
+HttpHeaderValidator::HeaderEntryValidationResult
+HttpHeaderValidator::validateSchemeHeaderCaseInsensitive(const ::Envoy::Http::HeaderString& value) {
+  // This is an adapter used for the dispatch table in validateRequestHeaderEntry.
+  // It is required to be an instance method since we have to use method pointers
+  return validateSchemeHeader(SchemePseudoHeaderValidationMode::AllowUppercase, value);
 }
 
 HeaderValidator::HeaderEntryValidationResult
@@ -277,7 +284,7 @@ HttpHeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   bool allow_underscores = !config_.reject_headers_with_underscores();
   // This header name is initially invalid if the name is empty or if the name
   // matches an incompatible connection-specific header.
-  bool is_valid = key_string_view.size() > 0;
+  bool is_valid = !key_string_view.empty();
 
   for (std::size_t i{0}; i < key_string_view.size() && is_valid; ++i) {
     const auto& c = key_string_view.at(i);
@@ -326,7 +333,7 @@ HttpHeaderValidator::validateContentLengthHeader(const HeaderString& value) {
   //
   const auto& value_string_view = value.getStringView();
 
-  if (!value_string_view.size()) {
+  if (value_string_view.empty()) {
     return HeaderValidator::HeaderEntryValidationResult::Reject;
   }
 
