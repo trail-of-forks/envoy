@@ -13,6 +13,8 @@ namespace EnvoyDefault {
 using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig;
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::HeaderValidator;
+using HeaderValidatorFunction =
+    HeaderValidator::HeaderEntryValidationResult (Http2HeaderValidator::*)(const HeaderString&);
 
 //
 // Header validation implementation for the Http/2 codec. This class follows guidance from
@@ -30,18 +32,11 @@ Http2HeaderValidator::Http2HeaderValidator(const HeaderValidatorConfig& config,
 HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
                                                  const HeaderString& value) {
-
-  using HeaderValidatorFunction = Envoy::Http::HeaderValidator::HeaderEntryValidationResult (
-      Http2HeaderValidator::*)(const ::Envoy::Http::HeaderString&);
-
   static const absl::node_hash_map<absl::string_view, HeaderValidatorFunction> kHeaderValidatorMap{
-      // Verify that the :method matches a well known value if the configuration is set to
-      // restrict methods. When not restricting methods, the generic validation will validate
-      // the :method value.
       {":method", &Http2HeaderValidator::validateMethodHeader},
       {":authority", &Http2HeaderValidator::validateAuthorityHeader},
       {"host", &Http2HeaderValidator::validateAuthorityHeader},
-      {":scheme", &Http2HeaderValidator::validateSchemeHeaderCaseInsensitive},
+      {":scheme", &Http2HeaderValidator::validateSchemeHeader},
       {":path", &Http2HeaderValidator::validatePathHeader},
       {"te", &Http2HeaderValidator::validateTEHeader},
       {"content-length", &Http2HeaderValidator::validateContentLengthHeader},

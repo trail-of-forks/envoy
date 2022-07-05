@@ -12,6 +12,8 @@ namespace EnvoyDefault {
 using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig;
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::HeaderValidator;
+using HeaderValidatorFunction =
+    HeaderValidator::HeaderEntryValidationResult (Http1HeaderValidator::*)(const HeaderString&);
 
 //
 // Header validation implementation for the Http/1 codec. This class follows guidance from
@@ -28,14 +30,11 @@ Http1HeaderValidator::Http1HeaderValidator(const HeaderValidatorConfig& config,
 HeaderValidator::HeaderEntryValidationResult
 Http1HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
                                                  const HeaderString& value) {
-  using HeaderValidatorFunction = Envoy::Http::HeaderValidator::HeaderEntryValidationResult (
-      Http1HeaderValidator::*)(const ::Envoy::Http::HeaderString&);
-
   static const absl::node_hash_map<absl::string_view, HeaderValidatorFunction> kHeaderValidatorMap{
       {":method", &Http1HeaderValidator::validateMethodHeader},
       {":authority", &Http1HeaderValidator::validateHostHeader},
       {"host", &Http1HeaderValidator::validateHostHeader},
-      {":scheme", &Http1HeaderValidator::validateSchemeHeaderCaseInsensitive},
+      {":scheme", &Http1HeaderValidator::validateSchemeHeader},
       {":path", &Http1HeaderValidator::validatePathHeader},
       {"transfer-encoding", &Http1HeaderValidator::validateTransferEncodingHeader},
       {"content-length", &Http1HeaderValidator::validateContentLengthHeader},

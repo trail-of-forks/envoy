@@ -54,23 +54,9 @@ public:
   virtual HeaderEntryValidationResult
   validateContentLengthHeader(const ::Envoy::Http::HeaderString& value);
 
-  // Configuration for validateSchemePseudoHeaderValue
-  enum class SchemePseudoHeaderValidationMode {
-    // Strict
-    Strict,
-
-    // Like strict, but allow uppercase characters
-    AllowUppercase,
-  };
-
   // Validates the given scheme pseudo header value
   virtual HeaderEntryValidationResult
-  validateSchemeHeader(const SchemePseudoHeaderValidationMode& mode,
-                       const ::Envoy::Http::HeaderString& value);
-
-  // Validates the :scheme header, ignoring case
-  HeaderEntryValidationResult
-  validateSchemeHeaderCaseInsensitive(const ::Envoy::Http::HeaderString& value);
+  validateSchemeHeader(const ::Envoy::Http::HeaderString& value);
 
   virtual HeaderEntryValidationResult validateHostHeader(const ::Envoy::Http::HeaderString& value);
 
