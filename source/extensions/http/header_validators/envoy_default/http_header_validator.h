@@ -69,22 +69,10 @@ public:
   validateContentLengthHeader(const ::Envoy::Http::HeaderString& value);
 
   /*
-   * Configuration for the validateSchemeHeader method.
-   */
-  enum class SchemePseudoHeaderValidationMode {
-    // Strict - value must be lowercase and match RFC allowed characters
-    Strict,
-
-    // Like strict, but allow uppercase characters
-    AllowUppercase,
-  };
-
-  /*
    * Validate the :scheme pseudo header.
    */
   virtual HeaderEntryValidationResult
-  validateSchemeHeader(const SchemePseudoHeaderValidationMode& mode,
-                       const ::Envoy::Http::HeaderString& value);
+  validateSchemeHeader(const ::Envoy::Http::HeaderString& value);
 
   /*
    * Validate the host or :authority pseudo header.

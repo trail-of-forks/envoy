@@ -74,28 +74,19 @@ TEST_F(BaseHeaderValidatorTest, ValidateMethodStrict) {
             HeaderValidator::HeaderEntryValidationResult::Reject);
 }
 
-TEST_F(BaseHeaderValidatorTest, ValidateSchemeStrict) {
-  auto mode = HttpHeaderValidator::SchemePseudoHeaderValidationMode::Strict;
+TEST_F(BaseHeaderValidatorTest, ValidateScheme) {
   HeaderString valid{"https"};
-  HeaderString invalid_first{"Https"};
-  HeaderString invalid_middle{"http+Ssh"};
+  HeaderString valid_mixed_case{"hTtPs"};
+  HeaderString invalid{"http_ssh"};
+  HeaderString invalid_first_char{"+http"};
   auto uhv = createBase(empty_config);
-  EXPECT_EQ(uhv->validateSchemeHeader(mode, valid),
-            HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(uhv->validateSchemeHeader(mode, invalid_first),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
-  EXPECT_EQ(uhv->validateSchemeHeader(mode, invalid_middle),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
-}
 
-TEST_F(BaseHeaderValidatorTest, ValidateSchemeUppercase) {
-  auto mode = HttpHeaderValidator::SchemePseudoHeaderValidationMode::AllowUppercase;
-  HeaderString valid{"HTTPS"};
-  HeaderString invalid_middle{"http_ssh"};
-  auto uhv = createBase(empty_config);
-  EXPECT_EQ(uhv->validateSchemeHeader(mode, valid),
+  EXPECT_EQ(uhv->validateSchemeHeader(valid), HeaderValidator::HeaderEntryValidationResult::Accept);
+  EXPECT_EQ(uhv->validateSchemeHeader(valid_mixed_case),
             HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(uhv->validateSchemeHeader(mode, invalid_middle),
+  EXPECT_EQ(uhv->validateSchemeHeader(invalid),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(uhv->validateSchemeHeader(invalid_first_char),
             HeaderValidator::HeaderEntryValidationResult::Reject);
 }
 

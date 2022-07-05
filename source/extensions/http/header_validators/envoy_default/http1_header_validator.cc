@@ -12,6 +12,8 @@ namespace EnvoyDefault {
 using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig;
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::HeaderValidator;
+using HeaderValidatorFunction =
+    HeaderValidator::HeaderEntryValidationResult (Http1HeaderValidator::*)(const HeaderString&);
 
 /*
  * Header validation implementation for the Http/1 codec. This class follows guidance from
@@ -29,50 +31,49 @@ Http1HeaderValidator::Http1HeaderValidator(const HeaderValidatorConfig& config,
 HeaderValidator::HeaderEntryValidationResult
 Http1HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
                                                  const HeaderString& value) {
-  const auto& key_string_view = key.getStringView();
+  static const absl::node_hash_map<absl::string_view, HeaderValidatorFunction> kHeaderValidatorMap{
+      {":method", &Http1HeaderValidator::validateMethodHeader},
+      {":authority", &Http1HeaderValidator::validateHostHeader},
+      {"host", &Http1HeaderValidator::validateHostHeader},
+      {":scheme", &Http1HeaderValidator::validateSchemeHeader},
+      {":path", &Http1HeaderValidator::validatePathHeader},
+      {"transfer-encoding", &Http1HeaderValidator::validateTransferEncodingHeader},
+      {"content-length", &Http1HeaderValidator::validateContentLengthHeader},
+  };
 
-  if (!key_string_view.size()) {
+  const auto& key_string_view = key.getStringView();
+  if (key_string_view.empty()) {
     // reject empty header names
     return HeaderValidator::HeaderEntryValidationResult::Reject;
   }
 
-  if (key_string_view == ":method") {
-    // Verify that the :method matches a well known value if the configuration is set to restrict
-    // methods. When not restricting methods, the generic validation will validate the :method
-    // value.
-    return validateMethodHeader(value);
-  } else if (key_string_view == ":authority" || key_string_view == "host") {
-    // Validate the :authority or legacy host header
-    return validateHostHeader(value);
-  } else if (key_string_view == ":scheme") {
-    // Validate the :scheme header, allowing for uppercase characters
-    return validateSchemeHeader(SchemePseudoHeaderValidationMode::AllowUppercase, value);
-  } else if (key_string_view == ":path") {
-    // Validate the :path header
-    return validatePathHeader(value);
-  } else if (key_string_view == "transfer-encoding") {
-    // Validate the :transfer-encoding header
-    return validateTransferEncodingHeader(value);
-  } else if (key_string_view == "content-length") {
-    // Validate the content-length header
-    return validateContentLengthHeader(value);
-  } else if (key_string_view.at(0) != ':') {
-    // Validate the (non-pseudo) header name
-    auto name_result = validateGenericHeaderName(key);
-    if (name_result == HeaderValidator::HeaderEntryValidationResult::Reject) {
-      return name_result;
+  auto result{HeaderValidator::HeaderEntryValidationResult::Reject};
+
+  auto validator_it = kHeaderValidatorMap.find(key_string_view);
+  if (validator_it != kHeaderValidatorMap.end()) {
+    const auto& validator = validator_it->second;
+    result = (*this.*validator)(value);
+
+  } else {
+    if (key_string_view.at(0) != ':') {
+      // Validate the (non-pseudo) header name
+      auto name_result = validateGenericHeaderName(key);
+      if (name_result == HeaderValidator::HeaderEntryValidationResult::Reject) {
+        return name_result;
+      }
     }
+
+    result = validateGenericHeaderValue(value);
   }
 
-  // Validate the header value
-  return validateGenericHeaderValue(value);
+  return result;
 }
 
 HeaderValidator::HeaderEntryValidationResult
 Http1HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
                                                   const HeaderString& value) {
   const auto& key_string_view = key.getStringView();
-  if (!key_string_view.size()) {
+  if (key_string_view.empty()) {
     // reject empty header names
     return HeaderValidator::HeaderEntryValidationResult::Reject;
   }
