@@ -84,7 +84,7 @@ HttpHeaderValidator::validateMethodHeader(const HeaderString& value) {
   if (config_.restrict_http_methods()) {
     is_valid = kHttpMethodRegistry.contains(method);
   } else {
-    is_valid = method.size() > 0;
+    is_valid = !method.empty();
     for (std::size_t i = 0; i < method.size() && is_valid; ++i) {
       char c = method[i];
       is_valid = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
@@ -97,8 +97,7 @@ HttpHeaderValidator::validateMethodHeader(const HeaderString& value) {
 }
 
 HeaderValidator::HeaderEntryValidationResult
-HttpHeaderValidator::validateSchemeHeader(const SchemePseudoHeaderValidationMode& mode,
-                                          const HeaderString& value) {
+HttpHeaderValidator::validateSchemeHeader(const HeaderString& value) {
   //
   // From RFC 3986, https://datatracker.ietf.org/doc/html/rfc3986#section-3.1:
   //
@@ -112,16 +111,7 @@ HttpHeaderValidator::validateSchemeHeader(const SchemePseudoHeaderValidationMode
   //
   // The validation mode controls whether uppercase letters are permitted.
   //
-
-  // SchemePseudoHeaderValidationMode::Strict
-  static const absl::node_hash_set<char> kStrictCharacterList = {
-      'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-      'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-      '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '-', '.',
-  };
-
-  // SchemePseudoHeaderValidationMode::AllowUppercase
-  static const absl::node_hash_set<char> kExtendedCharacterList = {
+  static const absl::node_hash_set<char> kAllowedChars = {
       'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q',
       'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h',
       'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y',
@@ -137,21 +127,14 @@ HttpHeaderValidator::validateSchemeHeader(const SchemePseudoHeaderValidationMode
   auto character_it = value_string_view.begin();
 
   // The first character must be an ALPHA
-  auto valid_first_character = (*character_it >= 'a' && *character_it <= 'z');
-  if (!valid_first_character && mode == SchemePseudoHeaderValidationMode::AllowUppercase) {
-    valid_first_character = (*character_it >= 'A' && *character_it <= 'Z');
-  }
-
+  auto valid_first_character = (*character_it >= 'a' && *character_it <= 'z') ||
+                               (*character_it >= 'A' && *character_it <= 'Z');
   if (!valid_first_character) {
     return HeaderValidator::HeaderEntryValidationResult::Reject;
   }
 
-  const auto& validation_map = mode == SchemePseudoHeaderValidationMode::Strict
-                                   ? kStrictCharacterList
-                                   : kExtendedCharacterList;
-
   for (++character_it; character_it != value_string_view.end(); ++character_it) {
-    if (!validation_map.contains(*character_it)) {
+    if (!kAllowedChars.contains(*character_it)) {
       return HeaderValidator::HeaderEntryValidationResult::Reject;
     }
   }
@@ -277,7 +260,7 @@ HttpHeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   bool allow_underscores = !config_.reject_headers_with_underscores();
   // This header name is initially invalid if the name is empty or if the name
   // matches an incompatible connection-specific header.
-  bool is_valid = key_string_view.size() > 0;
+  bool is_valid = !key_string_view.empty();
 
   for (std::size_t i{0}; i < key_string_view.size() && is_valid; ++i) {
     const auto& c = key_string_view.at(i);
@@ -326,7 +309,7 @@ HttpHeaderValidator::validateContentLengthHeader(const HeaderString& value) {
   //
   const auto& value_string_view = value.getStringView();
 
-  if (!value_string_view.size()) {
+  if (value_string_view.empty()) {
     return HeaderValidator::HeaderEntryValidationResult::Reject;
   }
 

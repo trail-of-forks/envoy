@@ -273,12 +273,18 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderContentLength) {
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderScheme) {
   HeaderString scheme{":scheme"};
   HeaderString valid{"https"};
+  HeaderString valid_mixed_case{"hTtPs"};
   HeaderString invalid{"http_ssh"};
+  HeaderString invalid_first_char{"+http"};
   auto uhv = createH2(empty_config);
 
   EXPECT_EQ(uhv->validateRequestHeaderEntry(scheme, valid),
             HeaderValidator::HeaderEntryValidationResult::Accept);
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(scheme, valid_mixed_case),
+            HeaderValidator::HeaderEntryValidationResult::Accept);
   EXPECT_EQ(uhv->validateRequestHeaderEntry(scheme, invalid),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(scheme, invalid_first_char),
             HeaderValidator::HeaderEntryValidationResult::Reject);
 }
 

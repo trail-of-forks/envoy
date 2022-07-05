@@ -94,14 +94,20 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryAuthority) {
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryScheme) {
-  HeaderString name{":scheme"};
+  HeaderString scheme{":scheme"};
   HeaderString valid{"https"};
+  HeaderString valid_mixed_case{"hTtPs"};
   HeaderString invalid{"http_ssh"};
+  HeaderString invalid_first_char{"+http"};
   auto uhv = createH1(empty_config);
 
-  EXPECT_EQ(uhv->validateRequestHeaderEntry(name, valid),
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(scheme, valid),
             HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(uhv->validateRequestHeaderEntry(name, invalid),
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(scheme, valid_mixed_case),
+            HeaderValidator::HeaderEntryValidationResult::Accept);
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(scheme, invalid),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(scheme, invalid_first_char),
             HeaderValidator::HeaderEntryValidationResult::Reject);
 }
 

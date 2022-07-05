@@ -1,5 +1,6 @@
 #include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
 
+#include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/string_view.h"
 
@@ -12,6 +13,8 @@ namespace EnvoyDefault {
 using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig;
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::HeaderValidator;
+using HeaderValidatorFunction =
+    HeaderValidator::HeaderEntryValidationResult (Http2HeaderValidator::*)(const HeaderString&);
 
 //
 // Header validation implementation for the Http/2 codec. This class follows guidance from
@@ -29,50 +32,49 @@ Http2HeaderValidator::Http2HeaderValidator(const HeaderValidatorConfig& config,
 HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
                                                  const HeaderString& value) {
-  const auto& key_string_view = key.getStringView();
+  static const absl::node_hash_map<absl::string_view, HeaderValidatorFunction> kHeaderValidatorMap{
+      {":method", &Http2HeaderValidator::validateMethodHeader},
+      {":authority", &Http2HeaderValidator::validateAuthorityHeader},
+      {"host", &Http2HeaderValidator::validateAuthorityHeader},
+      {":scheme", &Http2HeaderValidator::validateSchemeHeader},
+      {":path", &Http2HeaderValidator::validatePathHeader},
+      {"te", &Http2HeaderValidator::validateTEHeader},
+      {"content-length", &Http2HeaderValidator::validateContentLengthHeader},
+  };
 
-  if (!key_string_view.size()) {
+  const auto& key_string_view = key.getStringView();
+  if (key_string_view.empty()) {
     // reject empty header names
     return HeaderValidator::HeaderEntryValidationResult::Reject;
   }
 
-  if (key_string_view == ":method") {
-    // Verify that the :method matches a well own value if the configuration is set to
-    // restrict methods. When not restricting methods, the generic validation will validate
-    // the :method value.
-    return validateMethodHeader(value);
-  } else if (key_string_view == ":authority" || key_string_view == "host") {
-    // Validate the :authority or legacy host header
-    return validateAuthorityHeader(value);
-  } else if (key_string_view == ":scheme") {
-    // Validate the :scheme header, allowing for uppercase characters
-    return validateSchemeHeader(SchemePseudoHeaderValidationMode::AllowUppercase, value);
-  } else if (key_string_view == ":path") {
-    // Validate the :path header
-    return validatePathHeader(value);
-  } else if (key_string_view == "te") {
-    // Validate the :transfer-encoding header
-    return validateTEHeader(value);
-  } else if (key_string_view == "content-length") {
-    // Validate the content-length header
-    return validateContentLengthHeader(value);
-  } else if (key_string_view.at(0) != ':') {
-    // Validate the (non-pseudo) header name
-    auto name_result = validateGenericHeaderName(key);
-    if (name_result == HeaderValidator::HeaderEntryValidationResult::Reject) {
-      return name_result;
+  auto result{HeaderValidator::HeaderEntryValidationResult::Reject};
+
+  auto validator_it = kHeaderValidatorMap.find(key_string_view);
+  if (validator_it != kHeaderValidatorMap.end()) {
+    const auto& validator = validator_it->second;
+    result = (*this.*validator)(value);
+
+  } else {
+    if (key_string_view.at(0) != ':') {
+      // Validate the (non-pseudo) header name
+      auto name_result = validateGenericHeaderName(key);
+      if (name_result == HeaderValidator::HeaderEntryValidationResult::Reject) {
+        return name_result;
+      }
     }
+
+    result = validateGenericHeaderValue(value);
   }
 
-  // Validate the header value
-  return validateGenericHeaderValue(value);
+  return result;
 }
 
 HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
                                                   const HeaderString& value) {
   const auto& key_string_view = key.getStringView();
-  if (!key_string_view.size()) {
+  if (key_string_view.empty()) {
     // reject empty header names
     return HeaderValidator::HeaderEntryValidationResult::Reject;
   }
@@ -231,8 +233,7 @@ Http2HeaderValidator::validateAuthorityHeader(const ::Envoy::Http::HeaderString&
 }
 
 HeaderValidator::HeaderEntryValidationResult
-Http2HeaderValidator::validatePathHeader(const ::Envoy::Http::HeaderString& value) {
-  static_cast<void>(value);
+Http2HeaderValidator::validatePathHeader(const ::Envoy::Http::HeaderString&) {
   return HeaderValidator::HeaderEntryValidationResult::Accept;
 }
 
@@ -262,8 +263,8 @@ Http2HeaderValidator::validateGenericHeaderName(const ::Envoy::Http::HeaderStrin
   //
   static const absl::node_hash_set<absl::string_view> kRejectHeaderNames = {
       "transfer-encoding", "connection", "upgrade", "keep-alive", "proxy-connection"};
-  const auto& key_string_view = key.getStringView();
 
+  const auto& key_string_view = key.getStringView();
   if (kRejectHeaderNames.contains(key_string_view)) {
     return HeaderValidator::HeaderEntryValidationResult::Reject;
   }

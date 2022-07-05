@@ -28,6 +28,7 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/http:header_validator_interface",
+        "//external:abseil_node_hash_map",
         "//external:abseil_node_hash_set",
         "//source/common/http:headers_lib",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
