@@ -6,6 +6,8 @@
 
 #include "absl/container/node_hash_set.h"
 
+#define TEST_CHAR(table, c) (table[static_cast<unsigned char>(c)] == 1)
+
 namespace Envoy {
 namespace Extensions {
 namespace Http {
@@ -75,9 +77,6 @@ HttpHeaderValidator::validateMethodHeader(const HeaderString& value) {
       "*",
   };
 
-  static absl::node_hash_set<char> kHttpMethodChars = {'!', '#', '$', '%', '&', '\'', '*', '+',
-                                                       '-', '.', '^', '_', '`', '|',  '~'};
-
   const auto& method = value.getStringView();
   bool is_valid = true;
 
@@ -86,9 +85,7 @@ HttpHeaderValidator::validateMethodHeader(const HeaderString& value) {
   } else {
     is_valid = !method.empty();
     for (std::size_t i = 0; i < method.size() && is_valid; ++i) {
-      char c = method[i];
-      is_valid = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
-                 kHttpMethodChars.contains(c);
+      is_valid = TEST_CHAR(kHttpMethodChars, method.at(i));
     }
   }
 
@@ -110,13 +107,6 @@ HttpHeaderValidator::validateSchemeHeader(const HeaderString& value) {
   //
   // The validation mode controls whether uppercase letters are permitted.
   //
-  static const absl::node_hash_set<char> kAllowedChars = {
-      'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q',
-      'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h',
-      'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y',
-      'z', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '-', '.',
-  };
-
   const auto& value_string_view = value.getStringView();
 
   if (value_string_view.empty()) {
@@ -133,7 +123,7 @@ HttpHeaderValidator::validateSchemeHeader(const HeaderString& value) {
   }
 
   for (++character_it; character_it != value_string_view.end(); ++character_it) {
-    if (!kAllowedChars.contains(*character_it)) {
+    if (!TEST_CHAR(kHttpSchemeChars, *character_it)) {
       return HeaderValidator::HeaderEntryValidationResult::Reject;
     }
   }
@@ -222,9 +212,9 @@ HttpHeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   bool is_valid = !key_string_view.empty();
 
   for (std::size_t i{0}; i < key_string_view.size() && is_valid; ++i) {
-    const auto& c = key_string_view.at(i);
-    is_valid = kNghttp2HeaderNameCharacterValidationMap[static_cast<unsigned char>(c)] &&
-               (c != '_' || allow_underscores);
+    char c = key_string_view.at(i);
+    is_valid =
+        TEST_CHAR(kNghttp2HeaderNameCharacterValidationMap, c) && (c != '_' || allow_underscores);
   }
 
   return is_valid ? HeaderValidator::HeaderEntryValidationResult::Accept
@@ -251,8 +241,7 @@ HttpHeaderValidator::validateGenericHeaderValue(const HeaderString& value) {
   bool is_valid = true;
 
   for (std::size_t i{0}; i < value_string_view.size() && is_valid; ++i) {
-    const auto& c = value_string_view.at(i);
-    is_valid = kNghttp2HeaderValueCharacterValidationMap[static_cast<unsigned char>(c)];
+    is_valid = TEST_CHAR(kNghttp2HeaderValueCharacterValidationMap, value_string_view.at(i));
   }
 
   return is_valid ? HeaderValidator::HeaderEntryValidationResult::Accept
