@@ -6,8 +6,6 @@
 
 #include "absl/container/node_hash_set.h"
 
-#define TEST_CHAR(table, c) (table[static_cast<unsigned char>(c)] == 1)
-
 namespace Envoy {
 namespace Extensions {
 namespace Http {
@@ -85,7 +83,7 @@ HttpHeaderValidator::validateMethodHeader(const HeaderString& value) {
   } else {
     is_valid = !method.empty();
     for (std::size_t i = 0; i < method.size() && is_valid; ++i) {
-      is_valid = TEST_CHAR(kHttpMethodChars, method.at(i));
+      is_valid = test_char(kMethodHeaderCharTable, method.at(i));
     }
   }
 
@@ -123,7 +121,7 @@ HttpHeaderValidator::validateSchemeHeader(const HeaderString& value) {
   }
 
   for (++character_it; character_it != value_string_view.end(); ++character_it) {
-    if (!TEST_CHAR(kHttpSchemeChars, *character_it)) {
+    if (!test_char(kSchemeHeaderCharTable, *character_it)) {
       return HeaderValidator::HeaderEntryValidationResult::Reject;
     }
   }
@@ -213,8 +211,7 @@ HttpHeaderValidator::validateGenericHeaderName(const HeaderString& name) {
 
   for (std::size_t i{0}; i < key_string_view.size() && is_valid; ++i) {
     char c = key_string_view.at(i);
-    is_valid =
-        TEST_CHAR(kNghttp2HeaderNameCharacterValidationMap, c) && (c != '_' || allow_underscores);
+    is_valid = test_char(kGenericHeaderNameCharTable, c) && (c != '_' || allow_underscores);
   }
 
   return is_valid ? HeaderValidator::HeaderEntryValidationResult::Accept
@@ -241,7 +238,7 @@ HttpHeaderValidator::validateGenericHeaderValue(const HeaderString& value) {
   bool is_valid = true;
 
   for (std::size_t i{0}; i < value_string_view.size() && is_valid; ++i) {
-    is_valid = TEST_CHAR(kNghttp2HeaderValueCharacterValidationMap, value_string_view.at(i));
+    is_valid = test_char(kGenericHeaderValueCharTable, value_string_view.at(i));
   }
 
   return is_valid ? HeaderValidator::HeaderEntryValidationResult::Accept
