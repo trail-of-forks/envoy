@@ -2,7 +2,7 @@
 
 #include <charconv>
 
-#include "source/extensions/http/header_validators/envoy_default/nghttp2_character_maps.h"
+#include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 
 #include "absl/container/node_hash_set.h"
 
@@ -189,8 +189,8 @@ HttpHeaderValidator::validateStatusHeader(const StatusPseudoHeaderValidationMode
 HeaderValidator::HeaderEntryValidationResult
 HttpHeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   //
-  // Use the nghttp2 character map to verify that the header name is valid. This also honors the
-  // underscore in header configuration setting.
+  // Verify that the header name is valid. This also honors the underscore in
+  // header configuration setting.
   //
   // From RFC 7230, https://datatracker.ietf.org/doc/html/rfc7230:
   //
@@ -221,7 +221,7 @@ HttpHeaderValidator::validateGenericHeaderName(const HeaderString& name) {
 HeaderValidator::HeaderEntryValidationResult
 HttpHeaderValidator::validateGenericHeaderValue(const HeaderString& value) {
   //
-  // use the nghttp2 character map to verify the header value is valid.
+  // Verify that the header value is valid.
   //
   // From RFC 7230, https://datatracker.ietf.org/doc/html/rfc7230:
   //

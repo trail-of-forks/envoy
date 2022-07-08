@@ -19,11 +19,11 @@ envoy_cc_library(
         "null_header_validator.cc",
     ],
     hdrs = [
+        "character_tables.h",
         "header_validator_factory.h",
         "http1_header_validator.h",
         "http2_header_validator.h",
         "http_header_validator.h",
-        "nghttp2_character_maps.h",
         "null_header_validator.h",
     ],
     deps = [
