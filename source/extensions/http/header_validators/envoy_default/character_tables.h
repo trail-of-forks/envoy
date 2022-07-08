@@ -1,11 +1,21 @@
 #pragma once
 
+#include <cstdint>
+
 namespace Envoy {
 namespace Extensions {
 namespace Http {
 namespace HeaderValidators {
 namespace EnvoyDefault {
 
+inline bool test_char(const uint32_t table[8], char c) {
+  uint8_t uc = static_cast<uint8_t>(c);
+  return (table[uc >> 5] & (0x80000000 >> (uc & 0x1f))) != 0;
+}
+
+//
+// Header name character table.
+// From RFC 7230: https://datatracker.ietf.org/doc/html/rfc7230#section-3.2
 //
 // header-field   = field-name ":" OWS field-value OWS
 // field-name     = token
@@ -17,7 +27,7 @@ namespace EnvoyDefault {
 //                ; any VCHAR, except delimiters
 //
 const uint32_t kGenericHeaderNameCharTable[] = {
-    // control chars
+    // control characters
     0b00000000000000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
     0b01011111001101101111111111000000,
@@ -33,6 +43,9 @@ const uint32_t kGenericHeaderNameCharTable[] = {
 };
 
 //
+// Header value character table.
+// From RFC 7230: https://datatracker.ietf.org/doc/html/rfc7230#section-3.2
+//
 // header-field   = field-name ":" OWS field-value OWS
 // field-value    = *( field-content / obs-fold )
 // field-content  = field-vchar [ 1*( SP / HTAB ) field-vchar ]
@@ -43,7 +56,7 @@ const uint32_t kGenericHeaderNameCharTable[] = {
 //                   ; visible (printing) characters
 //
 const uint32_t kGenericHeaderValueCharTable[] = {
-    // control chars
+    // control characters
     0b00000000010000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
     0b11111111111111111111111111111111,
@@ -59,13 +72,16 @@ const uint32_t kGenericHeaderValueCharTable[] = {
 };
 
 //
+// :method header character table.
+// From RFC 7230: https://datatracker.ietf.org/doc/html/rfc7230#section-3.1.1
+//
+// method = token
+// token = 1*tchar
 // tchar = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "."
 //       /  "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA
-// token = 1*tchar
-// method = token
 //
 const uint32_t kMethodHeaderCharTable[] = {
-    // control chars
+    // control characters
     0b00000000000000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
     0b01011111001101101111111111000000,
@@ -81,10 +97,13 @@ const uint32_t kMethodHeaderCharTable[] = {
 };
 
 //
+// :scheme header character table.
+// From RFC 3986: https://datatracker.ietf.org/doc/html/rfc3986#section-3.1
+//
 // scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )
 //
 const uint32_t kSchemeHeaderCharTable[] = {
-    // control chars
+    // control characters
     0b00000000000000000000000000000000,
     // !"#$%&'()*+,-./0123456789:;<=>?
     0b00000000000101101111111111000000,
@@ -98,11 +117,6 @@ const uint32_t kSchemeHeaderCharTable[] = {
     0b00000000000000000000000000000000,
     0b00000000000000000000000000000000,
 };
-
-inline bool test_char(const uint32_t table[8], char c) {
-  uint8_t uc = static_cast<uint8_t>(c);
-  return (table[uc >> 5] & (0x80000000 >> (uc & 0x1f))) != 0;
-}
 
 } // namespace EnvoyDefault
 } // namespace HeaderValidators
