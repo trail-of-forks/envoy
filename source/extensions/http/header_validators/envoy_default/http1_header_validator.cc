@@ -12,6 +12,7 @@ namespace EnvoyDefault {
 using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig;
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::HeaderValidator;
+using ::Envoy::Http::RequestHeaderMap;
 using HeaderValidatorFunction =
     HeaderValidator::HeaderEntryValidationResult (Http1HeaderValidator::*)(const HeaderString&);
 
@@ -97,7 +98,7 @@ Http1HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
 }
 
 HeaderValidator::RequestHeaderMapValidationResult
-Http1HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& header_map) {
+Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   static const absl::node_hash_set<absl::string_view> kAllowedPseudoHeaders = {
       ":method", ":scheme", ":authority", ":path"};
   //
@@ -162,6 +163,7 @@ Http1HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   }
 
   //
+  // Step 2: Validate Transfer-Encoding and Content-Length headers.
   // HTTP/1.1 disallows a Transfer-Encoding and Content-Length headers,
   // https://datatracker.ietf.org/doc/html/rfc7230#section-3.3.2:
   //
@@ -208,7 +210,35 @@ Http1HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   }
 
   //
-  // Step 2: Verify each request header
+  // Step 3: Normalize and validate :path header
+  //
+  if (is_connect_method) {
+    //
+    // The :path must be authority-form for CONNECT method requests. From RFC
+    // 7230: https://datatracker.ietf.org/doc/html/rfc7230#section-5.3.3:
+    //
+    // The authority-form of request-target is only used for CONNECT
+    // requests (Section 4.3.6 of [RFC7231]).
+    //
+    //    authority-form = authority
+    //
+    //  When making a CONNECT request to establish a tunnel through one or
+    //  more proxies, a client MUST send only the target URI's authority
+    //  component (excluding any userinfo and its "@" delimiter) as the
+    //  request-target.
+    //
+    if (validateHostHeader(header_map.Path()->value()) == HeaderEntryValidationResult::Reject) {
+      return HeaderValidator::RequestHeaderMapValidationResult::Reject;
+    }
+  } else {
+    auto path_result = normalizePathHeader(header_map);
+    if (path_result != HeaderValidator::RequestHeaderMapValidationResult::Accept) {
+      return path_result;
+    }
+  }
+
+  //
+  // Step 4: Verify each request header
   //
   auto status = HeaderValidator::RequestHeaderMapValidationResult::Accept;
   header_map.iterate([this, &status](const ::Envoy::Http::HeaderEntry& header_entry)
@@ -291,12 +321,6 @@ Http1HeaderValidator::validateTransferEncodingHeader(const HeaderString& value) 
   if (!absl::EqualsIgnoreCase(encoding, header_values_.TransferEncodingValues.Chunked)) {
     return HeaderValidator::HeaderEntryValidationResult::Reject;
   }
-  return HeaderValidator::HeaderEntryValidationResult::Accept;
-}
-
-HeaderValidator::HeaderEntryValidationResult
-Http1HeaderValidator::validatePathHeader(const HeaderString& value) {
-  static_cast<void>(value);
   return HeaderValidator::HeaderEntryValidationResult::Accept;
 }
 

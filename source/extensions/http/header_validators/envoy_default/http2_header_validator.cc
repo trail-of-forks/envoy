@@ -131,7 +131,17 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   }
 
   //
-  // Step 2: Verify each request header
+  // Step 2: Normalize the :path pseudo header
+  //
+  if (!is_connect_method) {
+    auto path_result = normalizePathHeader(header_map);
+    if (path_result != HeaderValidator::RequestHeaderMapValidationResult::Accept) {
+      return path_result;
+    }
+  }
+
+  //
+  // Step 3: Verify each request header
   //
   const auto& allowed_headers =
       is_connect_method ? kAllowedPseudoHeadersForConnect : kAllowedPseudoHeaders;
@@ -236,11 +246,6 @@ Http2HeaderValidator::validateAuthorityHeader(const ::Envoy::Http::HeaderString&
   // validate. The port, if present, is validated as a valid uint16_t port.
   //
   return validateHostHeader(value);
-}
-
-HeaderValidator::HeaderEntryValidationResult
-Http2HeaderValidator::validatePathHeader(const ::Envoy::Http::HeaderString&) {
-  return HeaderValidator::HeaderEntryValidationResult::Accept;
 }
 
 HeaderValidator::HeaderEntryValidationResult

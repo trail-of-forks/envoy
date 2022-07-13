@@ -34,11 +34,6 @@ public:
    */
   HeaderEntryValidationResult
   validateTransferEncodingHeader(const ::Envoy::Http::HeaderString& value);
-
-  /*
-   * Validate the :path pseudo header.
-   */
-  HeaderEntryValidationResult validatePathHeader(const ::Envoy::Http::HeaderString& value);
 };
 
 using Http1HeaderValidatorPtr = std::unique_ptr<Http1HeaderValidator>;

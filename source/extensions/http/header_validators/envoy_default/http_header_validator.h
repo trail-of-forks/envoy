@@ -75,9 +75,21 @@ public:
   validateSchemeHeader(const ::Envoy::Http::HeaderString& value);
 
   /*
-   * Validate the host or :authority pseudo header.
+   * Validate the Host header or :authority pseudo header. This method does not allow the
+   * userinfo component (user:pass@host).
    */
   virtual HeaderEntryValidationResult validateHostHeader(const ::Envoy::Http::HeaderString& value);
+
+  /*
+   * Normalize :path pseudo header.
+   */
+  virtual RequestHeaderMapValidationResult
+  normalizePathHeader(::Envoy::Http::RequestHeaderMap& header_map);
+
+  /*
+   * Validate the :path pseudo header.
+   */
+  virtual HeaderEntryValidationResult validatePathHeader(const ::Envoy::Http::HeaderString& value);
 
 protected:
   // Configuration

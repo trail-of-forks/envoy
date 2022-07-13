@@ -15,6 +15,7 @@ namespace EnvoyDefault {
 using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig;
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::HeaderValidator;
+using ::Envoy::Http::RequestHeaderMap;
 
 HttpHeaderValidator::HttpHeaderValidator(const HeaderValidatorConfig& config,
                                          StreamInfo::StreamInfo&)
@@ -319,6 +320,20 @@ HttpHeaderValidator::validateHostHeader(const HeaderString& value) {
     }
   }
 
+  return HeaderValidator::HeaderEntryValidationResult::Accept;
+}
+
+HeaderValidator::RequestHeaderMapValidationResult
+HttpHeaderValidator::normalizePathHeader(RequestHeaderMap& header_map) {
+  // TODO
+  static_cast<void>(header_map);
+  return HeaderValidator::RequestHeaderMapValidationResult::Accept;
+}
+
+HeaderValidator::HeaderEntryValidationResult
+HttpHeaderValidator::validatePathHeader(const HeaderString& value) {
+  // TODO
+  static_cast<void>(value);
   return HeaderValidator::HeaderEntryValidationResult::Accept;
 }
 

@@ -41,11 +41,6 @@ public:
 
   virtual HeaderEntryValidationResult
   validateGenericHeaderName(const ::Envoy::Http::HeaderString& name) override;
-
-  /*
-   * Validate the :path pseudo header.
-   */
-  HeaderEntryValidationResult validatePathHeader(const ::Envoy::Http::HeaderString& value);
 };
 
 using Http2HeaderValidatorPtr = std::unique_ptr<Http2HeaderValidator>;
