@@ -107,6 +107,8 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   static const absl::node_hash_set<absl::string_view> kAllowedPseudoHeaders = {
       ":method", ":scheme", ":authority", ":path"};
 
+  absl::string_view path = header_map.getPathValue();
+
   //
   // Step 1: verify that required pseudo headers are present.
   //
@@ -118,9 +120,10 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
 
   auto is_connect_method = header_map.method() == header_values_.MethodValues.Connect;
   auto is_options_method = header_map.method() == header_values_.MethodValues.Options;
+  bool path_is_asterisk = path == "*";
+  bool path_is_absolute = !path.empty() && path.at(0) == '/';
 
-  if (!is_connect_method &&
-      (header_map.getSchemeValue().empty() || header_map.getPathValue().empty())) {
+  if (!is_connect_method && (header_map.getSchemeValue().empty() || path.empty())) {
     //
     // If this is not a connect request, then we also need the scheme and path pseudo headers.
     // This is based on RFC 7540, https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.3:
@@ -130,9 +133,8 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     // HTTP request that omits mandatory pseudo-header fields is malformed (Section 8.1.2.6).
     //
     return HeaderValidator::RequestHeaderMapValidationResult::Reject;
-  } else if (is_connect_method &&
-             (!header_map.getPathValue().empty() || !header_map.getSchemeValue().empty() ||
-              header_map.authority().empty())) {
+  } else if (is_connect_method && (!path.empty() || !header_map.getSchemeValue().empty() ||
+                                   header_map.authority().empty())) {
     //
     // If this is a CONNECT request, :path and :scheme must be empty and :authority must be
     // provided. This is based on RFC 7540,
@@ -150,7 +152,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   //
   // Step 2: Validate and normalize the :path pseudo header
   //
-  if (!is_options_method && header_map.path() == "*") {
+  if (!is_options_method && path_is_asterisk) {
     //
     // Reject a request if the path is in asterisk-form, "*", and not an OPTIONS method. This is
     // based on RFC 7540, https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.3:
@@ -164,10 +166,8 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     return HeaderValidator::RequestHeaderMapValidationResult::Reject;
   }
 
-  if (!is_connect_method && !is_options_method &&
-      !config_.uri_path_normalization_options().skip_path_normalization()) {
+  if (path_is_absolute && !config_.uri_path_normalization_options().skip_path_normalization()) {
     // Normalize the path
-    // TODO(meilya) - this should only be applied when the path is absolute (starts with "/")
     // TODO(meilya) - this will be something like:
     //
     // auto path_result = path_normalizer_.normalizePathUri(header_map);

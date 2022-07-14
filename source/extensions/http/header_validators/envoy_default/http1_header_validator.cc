@@ -101,6 +101,7 @@ HeaderValidator::RequestHeaderMapValidationResult
 Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   static const absl::node_hash_set<absl::string_view> kAllowedPseudoHeaders = {
       ":method", ":scheme", ":authority", ":path"};
+  absl::string_view path = header_map.getPathValue();
   //
   // Step 1: verify that required pseudo headers are present. HTTP/1.1 requests requries the
   // :method and :path headers based on RFC 7230
@@ -108,7 +109,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   //
   // request-line   = method SP request-target SP HTTP-version CRLF
   //
-  if (header_map.getPathValue().empty() || header_map.getMethodValue().empty()) {
+  if (path.empty() || header_map.getMethodValue().empty()) {
     return HeaderValidator::RequestHeaderMapValidationResult::Reject;
   }
 
@@ -146,8 +147,8 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   //
   auto is_connect_method = header_map.method() == header_values_.MethodValues.Connect;
   auto is_options_method = header_map.method() == header_values_.MethodValues.Options;
-  auto path_is_star = header_map.path() == "*";
-  auto path_is_absolute = header_map.path().at(0) == '/';
+  auto path_is_asterisk = path == "*";
+  auto path_is_absolute = path.at(0) == '/';
 
   //
   // HTTP/1.1 allows for a path of "*" when for OPTIONS requests, based on RFC
@@ -158,7 +159,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   // ...
   // asterisk-form  = "*"
   //
-  if (!is_options_method && path_is_star) {
+  if (!is_options_method && path_is_asterisk) {
     return HeaderValidator::RequestHeaderMapValidationResult::Reject;
   }
 
