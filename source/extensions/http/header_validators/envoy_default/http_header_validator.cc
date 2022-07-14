@@ -19,7 +19,7 @@ using ::Envoy::Http::RequestHeaderMap;
 
 HttpHeaderValidator::HttpHeaderValidator(const HeaderValidatorConfig& config,
                                          StreamInfo::StreamInfo&)
-    : config_(config), header_values_(::Envoy::Http::Headers::get()) {}
+    : config_(config), header_values_(::Envoy::Http::Headers::get()), path_normalizer_(config) {}
 
 HeaderValidator::HeaderEntryValidationResult
 HttpHeaderValidator::validateMethodHeader(const HeaderString& value) {
@@ -323,18 +323,37 @@ HttpHeaderValidator::validateHostHeader(const HeaderString& value) {
   return HeaderValidator::HeaderEntryValidationResult::Accept;
 }
 
-HeaderValidator::RequestHeaderMapValidationResult
-HttpHeaderValidator::normalizePathHeader(RequestHeaderMap& header_map) {
-  // TODO
-  static_cast<void>(header_map);
-  return HeaderValidator::RequestHeaderMapValidationResult::Accept;
+HeaderValidator::HeaderEntryValidationResult
+HttpHeaderValidator::validateGenericPathHeader(const HeaderString& value) {
+  const auto& path = value.getStringView();
+  auto size = path.size();
+  bool is_valid = size > 0;
+
+  if (is_valid && path == "*") {
+    return HeaderValidator::HeaderEntryValidationResult::Accept;
+  } else if (is_valid && path.at(0) != '/') {
+    return HeaderValidator::HeaderEntryValidationResult::Reject;
+  }
+
+  for (std::size_t i{0}; i < size && is_valid; ++i) {
+    is_valid = test_char(kPathHeaderCharTable, path.at(i));
+  }
+
+  return is_valid ? HeaderValidator::HeaderEntryValidationResult::Accept
+                  : HeaderValidator::HeaderEntryValidationResult::Reject;
 }
 
 HeaderValidator::HeaderEntryValidationResult
-HttpHeaderValidator::validatePathHeader(const HeaderString& value) {
-  // TODO
-  static_cast<void>(value);
-  return HeaderValidator::HeaderEntryValidationResult::Accept;
+HttpHeaderValidator::validateUriPathHeader(const HeaderString& value) {
+  auto result = validateGenericPathHeader(value);
+  if (result == HeaderValidator::HeaderEntryValidationResult::Accept) {
+    auto path = value.getStringView();
+    if (path != "*" && path.at(0) != '/') {
+      result = HeaderValidator::HeaderEntryValidationResult::Reject;
+    }
+  }
+
+  return result;
 }
 
 } // namespace EnvoyDefault

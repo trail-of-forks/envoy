@@ -4,6 +4,7 @@
 #include "envoy/http/header_validator.h"
 
 #include "source/common/http/headers.h"
+#include "source/extensions/http/header_validators/envoy_default/path_normalizer.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -81,15 +82,14 @@ public:
   virtual HeaderEntryValidationResult validateHostHeader(const ::Envoy::Http::HeaderString& value);
 
   /*
-   * Normalize :path pseudo header.
+   * Validate the :path pseudo header. This method only validates that the :path header only
+   * contains valid characters and does not validate the syntax or form of the path URI.
    */
-  virtual RequestHeaderMapValidationResult
-  normalizePathHeader(::Envoy::Http::RequestHeaderMap& header_map);
+  virtual HeaderEntryValidationResult
+  validateGenericPathHeader(const ::Envoy::Http::HeaderString& value);
 
-  /*
-   * Validate the :path pseudo header.
-   */
-  virtual HeaderEntryValidationResult validatePathHeader(const ::Envoy::Http::HeaderString& value);
+  virtual HeaderEntryValidationResult
+  validateUriPathHeader(const ::Envoy::Http::HeaderString& value);
 
 protected:
   // Configuration
@@ -97,6 +97,8 @@ protected:
       config_;
   // Helper header value constants
   const ::Envoy::Http::HeaderValues& header_values_;
+
+  PathNormalizer path_normalizer_;
 };
 
 } // namespace EnvoyDefault

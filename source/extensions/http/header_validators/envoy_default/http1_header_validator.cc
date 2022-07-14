@@ -37,7 +37,8 @@ Http1HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
       {":authority", &Http1HeaderValidator::validateHostHeader},
       {"host", &Http1HeaderValidator::validateHostHeader},
       {":scheme", &Http1HeaderValidator::validateSchemeHeader},
-      {":path", &Http1HeaderValidator::validatePathHeader},
+      // TODO(meilya) - the path must be validated and can be in absolute, asterisk, or host form
+      // {":path", &Http1HeaderValidator::validateGenericPathHeader},
       {"transfer-encoding", &Http1HeaderValidator::validateTransferEncodingHeader},
       {"content-length", &Http1HeaderValidator::validateContentLengthHeader},
   };
@@ -142,11 +143,11 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   // field-value for Host that is identical to that authority component,
   // excluding any userinfo subcomponent and its "@" delimiter (Section 2.7.1).
   //
-  // TODO(meilya) - implement this logic after path parsing is completed.
-  //                Refer to H1 codec_impl handlePath()
+  // TODO(meilya) - should this be implemented here in UHV or the H1 codec?
   //
   auto is_connect_method = header_map.method() == header_values_.MethodValues.Connect;
   auto is_options_method = header_map.method() == header_values_.MethodValues.Options;
+  auto path_is_star = header_map.path() == "*";
 
   //
   // HTTP/1.1 allows for a path of "*" when for OPTIONS requests, based on RFC
@@ -157,8 +158,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   // ...
   // asterisk-form  = "*"
   //
-  //
-  if (!is_options_method && header_map.path() == "*") {
+  if (!is_options_method && path_is_star) {
     return HeaderValidator::RequestHeaderMapValidationResult::Reject;
   }
 
@@ -230,11 +230,23 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
     if (validateHostHeader(header_map.Path()->value()) == HeaderEntryValidationResult::Reject) {
       return HeaderValidator::RequestHeaderMapValidationResult::Reject;
     }
+  } else if (!config_.uri_path_normalization_options().skip_path_normalization()) {
+    // Validate and normalize the path, which must be a valid URI
+    //
+    // TODO(meilya) - this will be something like:
+    //
+    // auto path_result = path_normalizer_.normalizePathUri(header_map);
+    // if (path_result != HeaderValidator::RequestHeaderMapValidationResult::Accept) {
+    //   return path_result;
+    // }
   } else {
-    auto path_result = normalizePathHeader(header_map);
-    if (path_result != HeaderValidator::RequestHeaderMapValidationResult::Accept) {
-      return path_result;
-    }
+    // With path normalization disabled, we still need to validate the path.
+    // TODO(meilya) - this will be something like:
+    //
+    // auto uri_result = validateUriPathHeader(header_map.Path()->value());
+    // if (uri_result == HeaderValidator::HeaderEntryValidationResult::Reject) {
+    //   return HeaderValidator::RequestHeaderMapValidationResult::Reject;
+    // }
   }
 
   //

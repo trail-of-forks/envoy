@@ -38,7 +38,8 @@ Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
       {":authority", &Http2HeaderValidator::validateAuthorityHeader},
       {"host", &Http2HeaderValidator::validateAuthorityHeader},
       {":scheme", &Http2HeaderValidator::validateSchemeHeader},
-      {":path", &Http2HeaderValidator::validatePathHeader},
+      // TODO(meilya) - the path must be validated and can be in absolute, asterisk, or host form
+      // {":path", &Http2HeaderValidator::validateGenericPathHeader},
       {"te", &Http2HeaderValidator::validateTEHeader},
       {"content-length", &Http2HeaderValidator::validateContentLengthHeader},
   };
@@ -116,28 +117,69 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     return HeaderValidator::RequestHeaderMapValidationResult::Reject;
   }
 
-  //
-  // If this is not a connect request, then we also need the scheme and path pseudo headers.
-  // This is based on RFC 7540, https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.3:
-  //
-  // All HTTP/2 requests MUST include exactly one valid value for the ":method", ":scheme",
-  // and ":path" pseudo-header fields, unless it is a CONNECT request (Section 8.3). An
-  // HTTP request that omits mandatory pseudo-header fields is malformed (Section 8.1.2.6).
-  //
   auto is_connect_method = header_map.method() == header_values_.MethodValues.Connect;
+  auto is_options_method = header_map.method() == header_values_.MethodValues.Options;
+
   if (!is_connect_method &&
       (header_map.getSchemeValue().empty() || header_map.getPathValue().empty())) {
+    //
+    // If this is not a connect request, then we also need the scheme and path pseudo headers.
+    // This is based on RFC 7540, https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.3:
+    //
+    // All HTTP/2 requests MUST include exactly one valid value for the ":method", ":scheme",
+    // and ":path" pseudo-header fields, unless it is a CONNECT request (Section 8.3). An
+    // HTTP request that omits mandatory pseudo-header fields is malformed (Section 8.1.2.6).
+    //
+    return HeaderValidator::RequestHeaderMapValidationResult::Reject;
+  } else if (is_connect_method &&
+             (!header_map.getPathValue().empty() || !header_map.getSchemeValue().empty() ||
+              header_map.authority().empty())) {
+    //
+    // If this is a CONNECT request, :path and :scheme must be empty and :authority must be
+    // provided. This is based on RFC 7540,
+    // https://datatracker.ietf.org/doc/html/rfc7540#section-8.3:
+    //
+    //  * The ":method" pseudo-header field is set to "CONNECT".
+    //  * The ":scheme" and ":path" pseudo-header fields MUST be omitted.
+    //  * The ":authority" pseudo-header field contains the host and port to connect to
+    //    (equivalent to the authority-form of the request-target of CONNECT requests (see
+    //    [RFC7230], Section 5.3)).
+    //
     return HeaderValidator::RequestHeaderMapValidationResult::Reject;
   }
 
   //
-  // Step 2: Normalize the :path pseudo header
+  // Step 2: Validate and normalize the :path pseudo header
   //
-  if (!is_connect_method) {
-    auto path_result = normalizePathHeader(header_map);
-    if (path_result != HeaderValidator::RequestHeaderMapValidationResult::Accept) {
-      return path_result;
-    }
+  if (is_options_method && header_map.path() != "*") {
+    //
+    // Reject an OPTIONS request if the path is not in asterisk-form, "*". This is based on RFC
+    // 7540, https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.3:
+    //
+    // [The :path] pseudo-header field MUST NOT be empty for "http" or "https" URIs; "http" or
+    // "https" URIs that do not contain a path component MUST include a value of '/'. The
+    // exception to this rule is an OPTIONS request for an "http" or "https" URI that does not
+    // include a path component; these MUST include a ":path" pseudo-header field with a value
+    // of '*'.
+    //
+    return HeaderValidator::RequestHeaderMapValidationResult::Reject;
+  } else if (!is_connect_method && !is_options_method &&
+             !config_.uri_path_normalization_options().skip_path_normalization()) {
+    // Normalize the path
+    // TODO(meilya) - this will be something like:
+    //
+    // auto path_result = path_normalizer_.normalizePathUri(header_map);
+    // if (path_result != HeaderValidator::RequestHeaderMapValidationResult::Accept) {
+    //   return path_result;
+    // }
+  } else {
+    // With path normalization disabled, we still need to validate the path.
+    // TODO(meilya) - this will be something like:
+    //
+    // auto uri_result = validateUriPathHeader(header_map.Path()->value());
+    // if (uri_result == HeaderValidator::HeaderEntryValidationResult::Reject) {
+    //   return HeaderValidator::RequestHeaderMapValidationResult::Reject;
+    // }
   }
 
   //

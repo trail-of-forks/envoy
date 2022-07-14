@@ -118,6 +118,67 @@ const uint32_t kSchemeHeaderCharTable[] = {
     0b00000000000000000000000000000000,
 };
 
+//
+// :path header character table.
+// From RFC 3986: https://datatracker.ietf.org/doc/html/rfc3986#section-3.3
+//
+// path          = path-abempty    ; begins with "/" or is empty
+//               / path-absolute   ; begins with "/" but not "//"
+//               / path-noscheme   ; begins with a non-colon segment
+//               / path-rootless   ; begins with a segment
+//               / path-empty      ; zero characters
+//
+// path-abempty  = *( "/" segment )
+// path-absolute = "/" [ segment-nz *( "/" segment ) ]
+// path-noscheme = segment-nz-nc *( "/" segment )
+// path-rootless = segment-nz *( "/" segment )
+// path-empty    = 0<pchar>
+//
+// segment       = *pchar
+// segment-nz    = 1*pchar
+// segment-nz-nc = 1*( unreserved / pct-encoded / sub-delims / "@" )
+//               ; non-zero-length segment without any colon ":"
+//
+// pchar         = unreserved / pct-encoded / sub-delims / ":" / "@"
+//
+const uint32_t kPathHeaderCharTable[] = {
+    // control characters
+    0b00000000000000000000000000000000,
+    // !"#$%&'()*+,-./0123456789:;<=>?
+    0b01001111111111111111111111110100,
+    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+    0b11111111111111111111111111100001,
+    //`abcdefghijklmnopqrstuvwxyz{|}~
+    0b01111111111111111111111111100010,
+    // extended ascii
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+};
+
+//
+// Unreserved characters.
+// Also from RFC 3986: https://datatracker.ietf.org/doc/html/rfc3986#section-2.3
+//
+// unreserved  = ALPHA / DIGIT / "-" / "." / "_" / "~"
+//
+const uint32_t kUnreservedCharTable[] = {
+    // control characters
+    0b00000000000000000000000000000000,
+    // !"#$%&'()*+,-./0123456789:;<=>?
+    0b00000000000001101111111111000000,
+    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+    0b01111111111111111111111111100001,
+    //`abcdefghijklmnopqrstuvwxyz{|}~
+    0b01111111111111111111111111100010,
+    // extended ascii
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+};
+
 } // namespace EnvoyDefault
 } // namespace HeaderValidators
 } // namespace Http

@@ -159,11 +159,12 @@ TEST_F(Http2HeaderValidatorTest, ValidateTE) {
   EXPECT_EQ(uhv->validateTEHeader(deflate), HeaderValidator::HeaderEntryValidationResult::Reject);
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidatePath) {
+TEST_F(Http2HeaderValidatorTest, ValidateGenericPath) {
   HeaderString valid{"/"};
   auto uhv = createH2(empty_config);
   // TODO(meilya) - after path normalization has been approved and implemented
-  EXPECT_EQ(uhv->validatePathHeader(valid), HeaderValidator::HeaderEntryValidationResult::Accept);
+  EXPECT_EQ(uhv->validateGenericPathHeader(valid),
+            HeaderValidator::HeaderEntryValidationResult::Accept);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyConnectionRejected) {

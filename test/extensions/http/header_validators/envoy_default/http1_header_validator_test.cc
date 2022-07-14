@@ -34,11 +34,12 @@ TEST_F(Http1HeaderValidatorTest, ValidateTransferEncoding) {
             HeaderValidator::HeaderEntryValidationResult::Reject);
 }
 
-TEST_F(Http1HeaderValidatorTest, ValidatePath) {
+TEST_F(Http1HeaderValidatorTest, ValidateGenericPath) {
   HeaderString valid{"/"};
   auto uhv = createH1(empty_config);
 
-  EXPECT_EQ(uhv->validatePathHeader(valid), HeaderValidator::HeaderEntryValidationResult::Accept);
+  EXPECT_EQ(uhv->validateGenericPathHeader(valid),
+            HeaderValidator::HeaderEntryValidationResult::Accept);
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryEmpty) {
@@ -118,6 +119,7 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryPath) {
   auto uhv = createH1(empty_config);
   EXPECT_EQ(uhv->validateRequestHeaderEntry(name, valid),
             HeaderValidator::HeaderEntryValidationResult::Accept);
+  // TODO(meilya) - once path validation is hooked up, fix this to Reject
   EXPECT_EQ(uhv->validateRequestHeaderEntry(name, invalid),
             HeaderValidator::HeaderEntryValidationResult::Accept);
 }
