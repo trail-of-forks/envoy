@@ -103,7 +103,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
       ":method", ":scheme", ":authority", ":path"};
   absl::string_view path = header_map.getPathValue();
   //
-  // Step 1: verify that required pseudo headers are present. HTTP/1.1 requests requries the
+  // Step 1: verify that required pseudo headers are present. HTTP/1.1 requests requires the
   // :method and :path headers based on RFC 7230
   // https://datatracker.ietf.org/doc/html/rfc7230#section-3.1.1:
   //
@@ -237,7 +237,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
     //
     // TODO(meilya) - this will be something like:
     //
-    // auto path_result = path_normalizer_.normalizePathUri(header_map);
+    // auto path_result = normalizePathUri(header_map);
     // if (path_result != HeaderValidator::RequestHeaderMapValidationResult::Accept) {
     //   return path_result;
     // }

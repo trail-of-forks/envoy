@@ -170,7 +170,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     // Normalize the path
     // TODO(meilya) - this will be something like:
     //
-    // auto path_result = path_normalizer_.normalizePathUri(header_map);
+    // auto path_result = normalizePathUri(header_map);
     // if (path_result != HeaderValidator::RequestHeaderMapValidationResult::Accept) {
     //   return path_result;
     // }
@@ -279,9 +279,9 @@ Http2HeaderValidator::validateAuthorityHeader(const ::Envoy::Http::HeaderString&
   //
   // HTTP/2 deprecates the userinfo portion of the :authority header. Validate
   // the :authority header and reject the value if the userinfo is present. This
-  // is beased on RFC 7540, https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.3
+  // is based on RFC 7540, https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.3
   //
-  // The host portion can be any valid URI host, which this function deos not
+  // The host portion can be any valid URI host, which this function does not
   // validate. The port, if present, is validated as a valid uint16_t port.
   //
   return validateHostHeader(value);

@@ -30,7 +30,7 @@ public:
   validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) override;
 
   /*
-   * Valdiate the TE header.
+   * Validate the TE header.
    */
   HeaderEntryValidationResult validateTEHeader(const ::Envoy::Http::HeaderString& value);
 

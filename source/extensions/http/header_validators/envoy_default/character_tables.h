@@ -17,6 +17,7 @@ inline bool test_char(const uint32_t table[8], char c) {
 // Header name character table.
 // From RFC 7230: https://datatracker.ietf.org/doc/html/rfc7230#section-3.2
 //
+// SPELLCHECKER(off)
 // header-field   = field-name ":" OWS field-value OWS
 // field-name     = token
 // token          = 1*tchar
@@ -25,6 +26,7 @@ inline bool test_char(const uint32_t table[8], char c) {
 //                / "+" / "-" / "." / "^" / "_" / "`" / "|" / "~"
 //                / DIGIT / ALPHA
 //                ; any VCHAR, except delimiters
+//SPELLCHECKER(on)
 //
 const uint32_t kGenericHeaderNameCharTable[] = {
     // control characters
@@ -46,6 +48,7 @@ const uint32_t kGenericHeaderNameCharTable[] = {
 // Header value character table.
 // From RFC 7230: https://datatracker.ietf.org/doc/html/rfc7230#section-3.2
 //
+// SPELLCHECKER(off)
 // header-field   = field-name ":" OWS field-value OWS
 // field-value    = *( field-content / obs-fold )
 // field-content  = field-vchar [ 1*( SP / HTAB ) field-vchar ]
@@ -54,6 +57,7 @@ const uint32_t kGenericHeaderNameCharTable[] = {
 //
 // VCHAR          =  %x21-7E
 //                   ; visible (printing) characters
+// SPELLCHECKER(on)
 //
 const uint32_t kGenericHeaderValueCharTable[] = {
     // control characters
@@ -75,10 +79,12 @@ const uint32_t kGenericHeaderValueCharTable[] = {
 // :method header character table.
 // From RFC 7230: https://datatracker.ietf.org/doc/html/rfc7230#section-3.1.1
 //
+// SPELLCHECKER(off)
 // method = token
 // token = 1*tchar
 // tchar = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "."
 //       /  "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA
+// SPELLCHECKER(on)
 //
 const uint32_t kMethodHeaderCharTable[] = {
     // control characters
@@ -122,6 +128,7 @@ const uint32_t kSchemeHeaderCharTable[] = {
 // :path header character table.
 // From RFC 3986: https://datatracker.ietf.org/doc/html/rfc3986#section-3.3
 //
+// SPELLCHECKER(off)
 // path          = path-abempty    ; begins with "/" or is empty
 //               / path-absolute   ; begins with "/" but not "//"
 //               / path-noscheme   ; begins with a non-colon segment
@@ -140,6 +147,7 @@ const uint32_t kSchemeHeaderCharTable[] = {
 //               ; non-zero-length segment without any colon ":"
 //
 // pchar         = unreserved / pct-encoded / sub-delims / ":" / "@"
+// SPELLCHECKER(on)
 //
 const uint32_t kPathHeaderCharTable[] = {
     // control characters
