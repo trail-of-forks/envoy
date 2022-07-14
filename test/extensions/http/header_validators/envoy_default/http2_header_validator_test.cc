@@ -90,6 +90,56 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapConnectExtraPseudoHeade
             HeaderValidator::RequestHeaderMapValidationResult::Reject);
 }
 
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapConnectMissingAuthority) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "CONNECT"}, {"x-foo", "bar"}};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_EQ(uhv->validateRequestHeaderMap(headers),
+            HeaderValidator::RequestHeaderMapValidationResult::Reject);
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapConnectWithPath) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":method", "CONNECT"}, {":authority", "envoy.com"}, {":path", "/bar"}};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_EQ(uhv->validateRequestHeaderMap(headers),
+            HeaderValidator::RequestHeaderMapValidationResult::Reject);
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapConnectWithScheme) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":method", "CONNECT"}, {":authority", "envoy.com"}, {":scheme", "https"}};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_EQ(uhv->validateRequestHeaderMap(headers),
+            HeaderValidator::RequestHeaderMapValidationResult::Reject);
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapOptionsAsterisk) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "OPTIONS"},
+                                                  {":path", "*"},
+                                                  {":authority", "envoy.com"},
+                                                  {"x-foo", "bar"}};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_EQ(uhv->validateRequestHeaderMap(headers),
+            HeaderValidator::RequestHeaderMapValidationResult::Accept);
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapNotOptionsAsterisk) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "GET"},
+                                                  {":path", "*"},
+                                                  {":authority", "envoy.com"},
+                                                  {"x-foo", "bar"}};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_EQ(uhv->validateRequestHeaderMap(headers),
+            HeaderValidator::RequestHeaderMapValidationResult::Reject);
+}
+
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapInvalidAuthority) {
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
                                                   {":method", "GET"},
@@ -216,11 +266,13 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderAuthorityHost) {
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderPath) {
   HeaderString path{":path"};
   HeaderString valid{"/"};
+  HeaderString invalid{"/ bad path"};
   auto uhv = createH2(empty_config);
 
   EXPECT_EQ(uhv->validateRequestHeaderEntry(path, valid),
             HeaderValidator::HeaderEntryValidationResult::Accept);
-  // TODO(meilya) - add invalid case when path normalization is ready
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(path, invalid),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderTE) {

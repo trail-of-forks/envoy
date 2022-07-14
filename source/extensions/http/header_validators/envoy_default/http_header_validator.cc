@@ -329,12 +329,6 @@ HttpHeaderValidator::validateGenericPathHeader(const HeaderString& value) {
   auto size = path.size();
   bool is_valid = size > 0;
 
-  if (is_valid && path == "*") {
-    return HeaderValidator::HeaderEntryValidationResult::Accept;
-  } else if (is_valid && path.at(0) != '/') {
-    return HeaderValidator::HeaderEntryValidationResult::Reject;
-  }
-
   for (std::size_t i{0}; i < size && is_valid; ++i) {
     is_valid = test_char(kPathHeaderCharTable, path.at(i));
   }
@@ -343,18 +337,7 @@ HttpHeaderValidator::validateGenericPathHeader(const HeaderString& value) {
                   : HeaderValidator::HeaderEntryValidationResult::Reject;
 }
 
-HeaderValidator::HeaderEntryValidationResult
-HttpHeaderValidator::validateUriPathHeader(const HeaderString& value) {
-  auto result = validateGenericPathHeader(value);
-  if (result == HeaderValidator::HeaderEntryValidationResult::Accept) {
-    auto path = value.getStringView();
-    if (path != "*" && path.at(0) != '/') {
-      result = HeaderValidator::HeaderEntryValidationResult::Reject;
-    }
-  }
-
-  return result;
-}
+const PathNormalizer& HttpHeaderValidator::pathNormalizer() const { return path_normalizer_; }
 
 } // namespace EnvoyDefault
 } // namespace HeaderValidators

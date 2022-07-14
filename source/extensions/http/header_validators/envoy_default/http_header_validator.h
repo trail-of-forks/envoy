@@ -88,8 +88,7 @@ public:
   virtual HeaderEntryValidationResult
   validateGenericPathHeader(const ::Envoy::Http::HeaderString& value);
 
-  virtual HeaderEntryValidationResult
-  validateUriPathHeader(const ::Envoy::Http::HeaderString& value);
+  const PathNormalizer& pathNormalizer() const;
 
 protected:
   // Configuration

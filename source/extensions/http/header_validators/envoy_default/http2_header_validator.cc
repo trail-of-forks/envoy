@@ -38,8 +38,7 @@ Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
       {":authority", &Http2HeaderValidator::validateAuthorityHeader},
       {"host", &Http2HeaderValidator::validateAuthorityHeader},
       {":scheme", &Http2HeaderValidator::validateSchemeHeader},
-      // TODO(meilya) - the path must be validated and can be in absolute, asterisk, or host form
-      // {":path", &Http2HeaderValidator::validateGenericPathHeader},
+      {":path", &Http2HeaderValidator::validateGenericPathHeader},
       {"te", &Http2HeaderValidator::validateTEHeader},
       {"content-length", &Http2HeaderValidator::validateContentLengthHeader},
   };
@@ -151,10 +150,10 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   //
   // Step 2: Validate and normalize the :path pseudo header
   //
-  if (is_options_method && header_map.path() != "*") {
+  if (!is_options_method && header_map.path() == "*") {
     //
-    // Reject an OPTIONS request if the path is not in asterisk-form, "*". This is based on RFC
-    // 7540, https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.3:
+    // Reject a request if the path is in asterisk-form, "*", and not an OPTIONS method. This is
+    // based on RFC 7540, https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2.3:
     //
     // [The :path] pseudo-header field MUST NOT be empty for "http" or "https" URIs; "http" or
     // "https" URIs that do not contain a path component MUST include a value of '/'. The
@@ -163,24 +162,22 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     // of '*'.
     //
     return HeaderValidator::RequestHeaderMapValidationResult::Reject;
-  } else if (!is_connect_method && !is_options_method &&
-             !config_.uri_path_normalization_options().skip_path_normalization()) {
+  }
+
+  if (!is_connect_method && !is_options_method &&
+      !config_.uri_path_normalization_options().skip_path_normalization()) {
     // Normalize the path
+    // TODO(meilya) - this should only be applied when the path is absolute (starts with "/")
     // TODO(meilya) - this will be something like:
     //
     // auto path_result = path_normalizer_.normalizePathUri(header_map);
     // if (path_result != HeaderValidator::RequestHeaderMapValidationResult::Accept) {
     //   return path_result;
     // }
-  } else {
-    // With path normalization disabled, we still need to validate the path.
-    // TODO(meilya) - this will be something like:
-    //
-    // auto uri_result = validateUriPathHeader(header_map.Path()->value());
-    // if (uri_result == HeaderValidator::HeaderEntryValidationResult::Reject) {
-    //   return HeaderValidator::RequestHeaderMapValidationResult::Reject;
-    // }
   }
+
+  // If path normalization is disabled or the path isn't absolute then the path will be validated
+  // against the RFC character set in validateRequestHeaderEntry.
 
   //
   // Step 3: Verify each request header

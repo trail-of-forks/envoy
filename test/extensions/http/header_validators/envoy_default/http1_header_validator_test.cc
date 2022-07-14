@@ -119,9 +119,8 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryPath) {
   auto uhv = createH1(empty_config);
   EXPECT_EQ(uhv->validateRequestHeaderEntry(name, valid),
             HeaderValidator::HeaderEntryValidationResult::Accept);
-  // TODO(meilya) - once path validation is hooked up, fix this to Reject
   EXPECT_EQ(uhv->validateRequestHeaderEntry(name, invalid),
-            HeaderValidator::HeaderEntryValidationResult::Accept);
+            HeaderValidator::HeaderEntryValidationResult::Reject);
 }
 
 TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderEntryTransferEncoding) {
