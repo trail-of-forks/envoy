@@ -17,7 +17,6 @@ envoy_cc_library(
         "http2_header_validator.cc",
         "http_header_validator.cc",
         "null_header_validator.cc",
-        "path_normalizer.cc",
     ],
     hdrs = [
         "character_tables.h",
@@ -26,7 +25,6 @@ envoy_cc_library(
         "http2_header_validator.h",
         "http_header_validator.h",
         "null_header_validator.h",
-        "path_normalizer.h",
     ],
     deps = [
         "//envoy/http:header_validator_interface",

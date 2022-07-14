@@ -4,7 +4,6 @@
 #include "envoy/http/header_validator.h"
 
 #include "source/common/http/headers.h"
-#include "source/extensions/http/header_validators/envoy_default/path_normalizer.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -88,16 +87,12 @@ public:
   virtual HeaderEntryValidationResult
   validateGenericPathHeader(const ::Envoy::Http::HeaderString& value);
 
-  const PathNormalizer& pathNormalizer() const;
-
 protected:
   // Configuration
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;
   // Helper header value constants
   const ::Envoy::Http::HeaderValues& header_values_;
-
-  PathNormalizer path_normalizer_;
 };
 
 } // namespace EnvoyDefault

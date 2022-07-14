@@ -19,7 +19,7 @@ using ::Envoy::Http::RequestHeaderMap;
 
 HttpHeaderValidator::HttpHeaderValidator(const HeaderValidatorConfig& config,
                                          StreamInfo::StreamInfo&)
-    : config_(config), header_values_(::Envoy::Http::Headers::get()), path_normalizer_(config) {}
+    : config_(config), header_values_(::Envoy::Http::Headers::get()) {}
 
 HeaderValidator::HeaderEntryValidationResult
 HttpHeaderValidator::validateMethodHeader(const HeaderString& value) {
@@ -336,8 +336,6 @@ HttpHeaderValidator::validateGenericPathHeader(const HeaderString& value) {
   return is_valid ? HeaderValidator::HeaderEntryValidationResult::Accept
                   : HeaderValidator::HeaderEntryValidationResult::Reject;
 }
-
-const PathNormalizer& HttpHeaderValidator::pathNormalizer() const { return path_normalizer_; }
 
 } // namespace EnvoyDefault
 } // namespace HeaderValidators
