@@ -26,7 +26,7 @@ inline bool test_char(const uint32_t table[8], char c) {
 //                / "+" / "-" / "." / "^" / "_" / "`" / "|" / "~"
 //                / DIGIT / ALPHA
 //                ; any VCHAR, except delimiters
-//SPELLCHECKER(on)
+// SPELLCHECKER(on)
 //
 const uint32_t kGenericHeaderNameCharTable[] = {
     // control characters
