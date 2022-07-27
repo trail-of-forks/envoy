@@ -43,6 +43,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapMissingPath) {
 
   EXPECT_EQ(uhv->validateRequestHeaderMap(headers),
             HeaderValidator::RequestHeaderMapValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().InvalidUrl);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapMissingMethod) {
@@ -52,6 +53,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapMissingMethod) {
 
   EXPECT_EQ(uhv->validateRequestHeaderMap(headers),
             HeaderValidator::RequestHeaderMapValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().InvalidMethod);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapMissingScheme) {
@@ -61,6 +63,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapMissingScheme) {
 
   EXPECT_EQ(uhv->validateRequestHeaderMap(headers),
             HeaderValidator::RequestHeaderMapValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().InvalidScheme);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapExtraPseudoHeader) {
@@ -70,6 +73,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapExtraPseudoHeader) {
 
   EXPECT_EQ(uhv->validateRequestHeaderMap(headers),
             HeaderValidator::RequestHeaderMapValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().InvalidPseudoHeader);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapConnect) {
@@ -88,6 +92,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapConnectExtraPseudoHeade
 
   EXPECT_EQ(uhv->validateRequestHeaderMap(headers),
             HeaderValidator::RequestHeaderMapValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().InvalidScheme);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapConnectMissingAuthority) {
@@ -96,6 +101,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapConnectMissingAuthority
 
   EXPECT_EQ(uhv->validateRequestHeaderMap(headers),
             HeaderValidator::RequestHeaderMapValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().InvalidHost);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapConnectWithPath) {
@@ -105,6 +111,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapConnectWithPath) {
 
   EXPECT_EQ(uhv->validateRequestHeaderMap(headers),
             HeaderValidator::RequestHeaderMapValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().InvalidUrl);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapConnectWithScheme) {
@@ -114,6 +121,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapConnectWithScheme) {
 
   EXPECT_EQ(uhv->validateRequestHeaderMap(headers),
             HeaderValidator::RequestHeaderMapValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().InvalidScheme);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapOptionsAsterisk) {
@@ -138,6 +146,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapNotOptionsAsterisk) {
 
   EXPECT_EQ(uhv->validateRequestHeaderMap(headers),
             HeaderValidator::RequestHeaderMapValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().InvalidUrl);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapInvalidAuthority) {
@@ -150,6 +159,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapInvalidAuthority) {
 
   EXPECT_EQ(uhv->validateRequestHeaderMap(headers),
             HeaderValidator::RequestHeaderMapValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().InvalidHost);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapEmptyGenericName) {
@@ -162,6 +172,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapEmptyGenericName) {
 
   EXPECT_EQ(uhv->validateRequestHeaderMap(headers),
             HeaderValidator::RequestHeaderMapValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().EmptyHeaderName);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderMapValid) {
@@ -177,6 +188,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderMapMissingStatus) {
   auto uhv = createH2(empty_config);
   EXPECT_EQ(uhv->validateResponseHeaderMap(headers),
             HeaderValidator::ResponseHeaderMapValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().InvalidStatus);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderMapExtraPseudoHeader) {
@@ -185,6 +197,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderMapExtraPseudoHeader) {
   auto uhv = createH2(empty_config);
   EXPECT_EQ(uhv->validateResponseHeaderMap(headers),
             HeaderValidator::ResponseHeaderMapValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().InvalidPseudoHeader);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderMapInvalidStatus) {
@@ -192,6 +205,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderMapInvalidStatus) {
   auto uhv = createH2(empty_config);
   EXPECT_EQ(uhv->validateResponseHeaderMap(headers),
             HeaderValidator::ResponseHeaderMapValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().InvalidStatus);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderMapEmptyGenericName) {
@@ -199,6 +213,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderMapEmptyGenericName) {
   auto uhv = createH2(empty_config);
   EXPECT_EQ(uhv->validateResponseHeaderMap(headers),
             HeaderValidator::ResponseHeaderMapValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().EmptyHeaderName);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateTE) {
@@ -207,6 +222,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateTE) {
   auto uhv = createH2(empty_config);
   EXPECT_EQ(uhv->validateTEHeader(trailers), HeaderValidator::HeaderEntryValidationResult::Accept);
   EXPECT_EQ(uhv->validateTEHeader(deflate), HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), "uhv.http2.invalid_te");
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateGenericPath) {
@@ -217,27 +233,50 @@ TEST_F(Http2HeaderValidatorTest, ValidateGenericPath) {
             HeaderValidator::HeaderEntryValidationResult::Accept);
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyConnectionRejected) {
+TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyConnectionRejectedTransferEncoding) {
   HeaderString transfer_encoding{"transfer-encoding"};
-  HeaderString connection{"connection"};
-  HeaderString keep_alive{"keep-alive"};
-  HeaderString upgrade{"upgrade"};
-  HeaderString proxy_connection{"proxy-connection"};
   auto uhv = createH2(empty_config);
 
   EXPECT_EQ(uhv->validateGenericHeaderName(transfer_encoding),
             HeaderValidator::HeaderEntryValidationResult::Reject);
-  EXPECT_EQ(uhv->validateGenericHeaderName(connection),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
-  EXPECT_EQ(uhv->validateGenericHeaderName(keep_alive),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
-  EXPECT_EQ(uhv->validateGenericHeaderName(upgrade),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
-  EXPECT_EQ(uhv->validateGenericHeaderName(proxy_connection),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), "uhv.http2.connection_header_rejected");
 }
 
-/* TODO(meilya) - add generic header name validation here */
+TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyConnectionRejectedConnection) {
+  HeaderString connection{"connection"};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_EQ(uhv->validateGenericHeaderName(connection),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), "uhv.http2.connection_header_rejected");
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyConnectionRejectedKeepAlive) {
+  HeaderString keep_alive{"keep-alive"};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_EQ(uhv->validateGenericHeaderName(keep_alive),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), "uhv.http2.connection_header_rejected");
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyConnectionRejectedUpgrde) {
+  HeaderString upgrade{"upgrade"};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_EQ(uhv->validateGenericHeaderName(upgrade),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), "uhv.http2.connection_header_rejected");
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyConnectionRejectedProxy) {
+  HeaderString proxy_connection{"proxy-connection"};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_EQ(uhv->validateGenericHeaderName(proxy_connection),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), "uhv.http2.connection_header_rejected");
+}
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderAuthority) {
   HeaderString authority{":authority"};
@@ -249,6 +288,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderAuthority) {
             HeaderValidator::HeaderEntryValidationResult::Accept);
   EXPECT_EQ(uhv->validateRequestHeaderEntry(authority, invalid),
             HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().InvalidHost);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderAuthorityHost) {
@@ -261,6 +301,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderAuthorityHost) {
             HeaderValidator::HeaderEntryValidationResult::Accept);
   EXPECT_EQ(uhv->validateRequestHeaderEntry(host, invalid),
             HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().InvalidHost);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderPath) {
@@ -273,6 +314,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderPath) {
             HeaderValidator::HeaderEntryValidationResult::Accept);
   EXPECT_EQ(uhv->validateRequestHeaderEntry(path, invalid),
             HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().InvalidUrl);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderTE) {
@@ -285,6 +327,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderTE) {
             HeaderValidator::HeaderEntryValidationResult::Accept);
   EXPECT_EQ(uhv->validateRequestHeaderEntry(name, invalid),
             HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), "uhv.http2.invalid_te");
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMethodAllowAllMethods) {
@@ -309,6 +352,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMethodRestrictMethods) {
             HeaderValidator::HeaderEntryValidationResult::Accept);
   EXPECT_EQ(uhv->validateRequestHeaderEntry(method, invalid),
             HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().InvalidMethod);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderContentLength) {
@@ -321,41 +365,70 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderContentLength) {
             HeaderValidator::HeaderEntryValidationResult::Accept);
   EXPECT_EQ(uhv->validateRequestHeaderEntry(content_length, invalid),
             HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().InvalidContentLength);
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderScheme) {
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderSchemeValid) {
   HeaderString scheme{":scheme"};
   HeaderString valid{"https"};
   HeaderString valid_mixed_case{"hTtPs"};
-  HeaderString invalid{"http_ssh"};
-  HeaderString invalid_first_char{"+http"};
   auto uhv = createH2(empty_config);
 
   EXPECT_EQ(uhv->validateRequestHeaderEntry(scheme, valid),
             HeaderValidator::HeaderEntryValidationResult::Accept);
   EXPECT_EQ(uhv->validateRequestHeaderEntry(scheme, valid_mixed_case),
             HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(uhv->validateRequestHeaderEntry(scheme, invalid),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
-  EXPECT_EQ(uhv->validateRequestHeaderEntry(scheme, invalid_first_char),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderGeneric) {
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderSchemeInvalidChar) {
+  HeaderString scheme{":scheme"};
+  HeaderString invalid{"http_ssh"};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(scheme, invalid),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().InvalidScheme);
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderSchemeInvalidStartChar) {
+  HeaderString scheme{":scheme"};
+  HeaderString invalid_first_char{"+http"};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(scheme, invalid_first_char),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().InvalidScheme);
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderGenericValid) {
   HeaderString valid_name{"x-foo"};
+  HeaderString valid_value{"bar"};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(valid_name, valid_value),
+            HeaderValidator::HeaderEntryValidationResult::Accept);
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderGenericInvalidName) {
   HeaderString invalid_name{""};
   HeaderString valid_value{"bar"};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_EQ(uhv->validateRequestHeaderEntry(invalid_name, valid_value),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().EmptyHeaderName);
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderGenericInvalidValue) {
+  HeaderString valid_name{"x-foo"};
   HeaderString invalid_value;
   auto uhv = createH2(empty_config);
 
   setHeaderStringUnvalidated(invalid_value, "hello\nworld");
 
-  EXPECT_EQ(uhv->validateRequestHeaderEntry(valid_name, valid_value),
-            HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(uhv->validateRequestHeaderEntry(invalid_name, valid_value),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
   EXPECT_EQ(uhv->validateRequestHeaderEntry(valid_name, invalid_value),
             HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().InvalidCharacters);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderAllowUnderscores) {
@@ -374,6 +447,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderRejectUnderscores) {
 
   EXPECT_EQ(uhv->validateRequestHeaderEntry(name, value),
             HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().InvalidUnderscore);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderStatus) {
@@ -386,23 +460,38 @@ TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderStatus) {
             HeaderValidator::HeaderEntryValidationResult::Accept);
   EXPECT_EQ(uhv->validateResponseHeaderEntry(status, invalid),
             HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().InvalidStatus);
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderGeneric) {
+TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderGenericValid) {
   HeaderString valid_name{"x-foo"};
+  HeaderString valid_value{"bar"};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_EQ(uhv->validateResponseHeaderEntry(valid_name, valid_value),
+            HeaderValidator::HeaderEntryValidationResult::Accept);
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderGenericInvalidName) {
   HeaderString invalid_name{""};
   HeaderString valid_value{"bar"};
+  auto uhv = createH2(empty_config);
+
+  EXPECT_EQ(uhv->validateResponseHeaderEntry(invalid_name, valid_value),
+            HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().EmptyHeaderName);
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderGenericInvalidValue) {
+  HeaderString valid_name{"x-foo"};
   HeaderString invalid_value;
   auto uhv = createH2(empty_config);
 
   setHeaderStringUnvalidated(invalid_value, "hello\nworld");
 
-  EXPECT_EQ(uhv->validateResponseHeaderEntry(valid_name, valid_value),
-            HeaderValidator::HeaderEntryValidationResult::Accept);
-  EXPECT_EQ(uhv->validateResponseHeaderEntry(invalid_name, valid_value),
-            HeaderValidator::HeaderEntryValidationResult::Reject);
   EXPECT_EQ(uhv->validateResponseHeaderEntry(valid_name, invalid_value),
             HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().InvalidCharacters);
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderAllowUnderscores) {
@@ -421,6 +510,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderRejectUnderscores) {
 
   EXPECT_EQ(uhv->validateResponseHeaderEntry(name, value),
             HeaderValidator::HeaderEntryValidationResult::Reject);
+  EXPECT_EQ(stream_info_.responseCodeDetails(), UhvResponseCodeDetail::get().InvalidUnderscore);
 }
 
 } // namespace

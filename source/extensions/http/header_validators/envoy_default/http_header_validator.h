@@ -91,9 +91,25 @@ protected:
   // Configuration
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;
+  StreamInfo::StreamInfo& stream_info_;
   // Helper header value constants
   const ::Envoy::Http::HeaderValues& header_values_;
 };
+
+struct UhvResponseCodeDetailValues {
+  const absl::string_view InvalidCharacters = "uhv.invalid_characters";
+  const absl::string_view InvalidUrl = "uhv.invalid_url";
+  const absl::string_view InvalidHost = "uhv.invalid_host";
+  const absl::string_view InvalidScheme = "uhv.invalid_scheme";
+  const absl::string_view InvalidMethod = "uhv.invalid_method";
+  const absl::string_view InvalidContentLength = "uhv.invalid_content_length";
+  const absl::string_view InvalidUnderscore = "uhv.unexpected_underscore";
+  const absl::string_view InvalidStatus = "uhv.invalid_status";
+  const absl::string_view EmptyHeaderName = "uhv.empty_header_name";
+  const absl::string_view InvalidPseudoHeader = "uhv.invalid_pseudo_header";
+};
+
+using UhvResponseCodeDetail = ConstSingleton<UhvResponseCodeDetailValues>;
 
 } // namespace EnvoyDefault
 } // namespace HeaderValidators

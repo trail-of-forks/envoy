@@ -16,6 +16,15 @@ using ::Envoy::Http::RequestHeaderMap;
 using HeaderValidatorFunction =
     HeaderValidator::HeaderEntryValidationResult (Http1HeaderValidator::*)(const HeaderString&);
 
+struct Http1ResponseCodeDetailValues {
+  const absl::string_view InvalidTransferEncoding = "uhv.http1.invalid_transfer_encoding";
+  const absl::string_view TransferEncodingNotAllowed = "uhv.http1.transfer_encoding_not_allowed";
+  const absl::string_view ContentLengthNotAllowed = "uhv.http1.content_length_not_allowed";
+  const absl::string_view ChunkedContentLength = "uhv.http1.content_length_and_chunked_not_allowed";
+};
+
+using Http1ResponseCodeDetail = ConstSingleton<Http1ResponseCodeDetailValues>;
+
 /*
  * Header validation implementation for the Http/1 codec. This class follows guidance from
  * several RFCS:
@@ -45,6 +54,7 @@ Http1HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
   const auto& key_string_view = key.getStringView();
   if (key_string_view.empty()) {
     // reject empty header names
+    stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().EmptyHeaderName);
     return HeaderValidator::HeaderEntryValidationResult::Reject;
   }
 
@@ -76,6 +86,7 @@ Http1HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
   const auto& key_string_view = key.getStringView();
   if (key_string_view.empty()) {
     // reject empty header names
+    stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().EmptyHeaderName);
     return HeaderValidator::HeaderEntryValidationResult::Reject;
   }
 
@@ -109,7 +120,13 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   //
   // request-line   = method SP request-target SP HTTP-version CRLF
   //
-  if (path.empty() || header_map.getMethodValue().empty()) {
+  if (path.empty()) {
+    stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().InvalidUrl);
+    return HeaderValidator::RequestHeaderMapValidationResult::Reject;
+  }
+
+  if (header_map.getMethodValue().empty()) {
+    stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().InvalidMethod);
     return HeaderValidator::RequestHeaderMapValidationResult::Reject;
   }
 
@@ -126,6 +143,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   // client MUST send a Host header field with an empty field-value.
   //
   if (header_map.getHostValue().empty()) {
+    stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().InvalidHost);
     return HeaderValidator::RequestHeaderMapValidationResult::Reject;
   }
 
@@ -160,6 +178,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   // asterisk-form  = "*"
   //
   if (!is_options_method && path_is_asterisk) {
+    stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().InvalidUrl);
     return HeaderValidator::RequestHeaderMapValidationResult::Reject;
   }
 
@@ -188,12 +207,15 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
     bool is_chunked = absl::EqualsIgnoreCase(header_map.getTransferEncodingValue(),
                                              header_values_.TransferEncodingValues.Chunked);
     if (!is_chunked || is_connect_method) {
+      stream_info_.setResponseCodeDetails(
+          Http1ResponseCodeDetail::get().TransferEncodingNotAllowed);
       return HeaderValidator::RequestHeaderMapValidationResult::Reject;
     }
 
     if (header_map.ContentLength()) {
       if (!config_.http1_protocol_options().allow_chunked_length()) {
         // Configuration does not allow chunked length, reject the request
+        stream_info_.setResponseCodeDetails(Http1ResponseCodeDetail::get().ChunkedContentLength);
         return HeaderValidator::RequestHeaderMapValidationResult::Reject;
       } else {
         // Allow a chunked transfer encoding and remove the content length.
@@ -206,6 +228,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
       header_map.removeContentLength();
     } else {
       // A content length in a CONNECT request is malformed
+      stream_info_.setResponseCodeDetails(Http1ResponseCodeDetail::get().ContentLengthNotAllowed);
       return HeaderValidator::RequestHeaderMapValidationResult::Reject;
     }
   }
@@ -256,9 +279,13 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
     const auto& header_value = header_entry.value();
     const auto& string_header_name = header_name.getStringView();
 
-    if (string_header_name.empty() ||
-        (string_header_name.at(0) == ':' && !kAllowedPseudoHeaders.contains(string_header_name))) {
+    if (string_header_name.empty()) {
+      stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().EmptyHeaderName);
+      status = HeaderValidator::RequestHeaderMapValidationResult::Reject;
+    } else if (string_header_name.at(0) == ':' &&
+               !kAllowedPseudoHeaders.contains(string_header_name)) {
       // This is an unrecognized pseudo header, reject the request
+      stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().InvalidPseudoHeader);
       status = HeaderValidator::RequestHeaderMapValidationResult::Reject;
     } else if (validateRequestHeaderEntry(header_name, header_value) ==
                HeaderValidator::HeaderEntryValidationResult::Reject) {
@@ -286,6 +313,7 @@ Http1HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
   // status-line = HTTP-version SP status-code SP reason-phrase CRLF
   //
   if (header_map.getStatusValue().empty()) {
+    stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().InvalidStatus);
     return HeaderValidator::ResponseHeaderMapValidationResult::Reject;
   }
 
@@ -299,10 +327,13 @@ Http1HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
     const auto& header_value = header_entry.value();
     const auto& string_header_name = header_name.getStringView();
 
-    if (string_header_name.empty() ||
-        (string_header_name.at(0) == ':' &&
-         !kAllowedPseudoHeaders.contains(header_name.getStringView()))) {
+    if (string_header_name.empty()) {
+      stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().EmptyHeaderName);
+      status = HeaderValidator::ResponseHeaderMapValidationResult::Reject;
+    } else if (string_header_name.at(0) == ':' &&
+               !kAllowedPseudoHeaders.contains(header_name.getStringView())) {
       // This is an unrecognized pseudo header, reject the response
+      stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().InvalidPseudoHeader);
       status = HeaderValidator::ResponseHeaderMapValidationResult::Reject;
     } else if (validateResponseHeaderEntry(header_name, header_value) ==
                HeaderValidator::HeaderEntryValidationResult::Reject) {
@@ -328,6 +359,7 @@ Http1HeaderValidator::validateTransferEncodingHeader(const HeaderString& value) 
   //
   const auto& encoding = value.getStringView();
   if (!absl::EqualsIgnoreCase(encoding, header_values_.TransferEncodingValues.Chunked)) {
+    stream_info_.setResponseCodeDetails(Http1ResponseCodeDetail::get().InvalidTransferEncoding);
     return HeaderValidator::HeaderEntryValidationResult::Reject;
   }
   return HeaderValidator::HeaderEntryValidationResult::Accept;

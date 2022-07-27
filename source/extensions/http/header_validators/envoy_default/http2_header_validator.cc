@@ -16,6 +16,13 @@ using ::Envoy::Http::HeaderValidator;
 using HeaderValidatorFunction =
     HeaderValidator::HeaderEntryValidationResult (Http2HeaderValidator::*)(const HeaderString&);
 
+struct Http2ResponseCodeDetailValues {
+  const absl::string_view InvalidTE = "uhv.http2.invalid_te";
+  const absl::string_view ConnectionHeaderSanitization = "uhv.http2.connection_header_rejected";
+};
+
+using Http2ResponseCodeDetail = ConstSingleton<Http2ResponseCodeDetailValues>;
+
 /*
  * Header validation implementation for the Http/2 codec. This class follows guidance from
  * several RFCS:
@@ -46,6 +53,7 @@ Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
   const auto& key_string_view = key.getStringView();
   if (key_string_view.empty()) {
     // reject empty header names
+    stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().EmptyHeaderName);
     return HeaderValidator::HeaderEntryValidationResult::Reject;
   }
 
@@ -77,6 +85,7 @@ Http2HeaderValidator::validateResponseHeaderEntry(const HeaderString& key,
   const auto& key_string_view = key.getStringView();
   if (key_string_view.empty()) {
     // reject empty header names
+    stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().EmptyHeaderName);
     return HeaderValidator::HeaderEntryValidationResult::Reject;
   }
 
@@ -115,6 +124,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   // The method pseudo header is always mandatory.
   //
   if (header_map.getMethodValue().empty()) {
+    stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().InvalidMethod);
     return HeaderValidator::RequestHeaderMapValidationResult::Reject;
   }
 
@@ -132,9 +142,11 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     // and ":path" pseudo-header fields, unless it is a CONNECT request (Section 8.3). An
     // HTTP request that omits mandatory pseudo-header fields is malformed (Section 8.1.2.6).
     //
+    auto details = path.empty() ? UhvResponseCodeDetail::get().InvalidUrl
+                                : UhvResponseCodeDetail::get().InvalidScheme;
+    stream_info_.setResponseCodeDetails(details);
     return HeaderValidator::RequestHeaderMapValidationResult::Reject;
-  } else if (is_connect_method && (!path.empty() || !header_map.getSchemeValue().empty() ||
-                                   header_map.authority().empty())) {
+  } else if (is_connect_method) {
     //
     // If this is a CONNECT request, :path and :scheme must be empty and :authority must be
     // provided. This is based on RFC 7540,
@@ -146,7 +158,19 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     //    (equivalent to the authority-form of the request-target of CONNECT requests (see
     //    [RFC7230], Section 5.3)).
     //
-    return HeaderValidator::RequestHeaderMapValidationResult::Reject;
+    absl::string_view details;
+    if (!path.empty()) {
+      details = UhvResponseCodeDetail::get().InvalidUrl;
+    } else if (!header_map.getSchemeValue().empty()) {
+      details = UhvResponseCodeDetail::get().InvalidScheme;
+    } else if (header_map.authority().empty()) {
+      details = UhvResponseCodeDetail::get().InvalidHost;
+    }
+
+    if (!details.empty()) {
+      stream_info_.setResponseCodeDetails(details);
+      return HeaderValidator::RequestHeaderMapValidationResult::Reject;
+    }
   }
 
   //
@@ -163,6 +187,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     // include a path component; these MUST include a ":path" pseudo-header field with a value
     // of '*'.
     //
+    stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().InvalidUrl);
     return HeaderValidator::RequestHeaderMapValidationResult::Reject;
   }
 
@@ -193,9 +218,14 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
         const auto& header_value = header_entry.value();
         const auto& string_header_name = header_name.getStringView();
 
-        if (string_header_name.empty() ||
-            (string_header_name.at(0) == ':' && !allowed_headers.contains(string_header_name))) {
+        if (string_header_name.empty()) {
+          // reject empty header names
+          stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().EmptyHeaderName);
+          status = HeaderValidator::RequestHeaderMapValidationResult::Reject;
+        } else if (string_header_name.at(0) == ':' &&
+                   !allowed_headers.contains(string_header_name)) {
           // This is an unrecognized pseudo header, reject the request
+          stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().InvalidPseudoHeader);
           status = HeaderValidator::RequestHeaderMapValidationResult::Reject;
         } else if (validateRequestHeaderEntry(header_name, header_value) ==
                    HeaderValidator::HeaderEntryValidationResult::Reject) {
@@ -224,6 +254,7 @@ Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
   // all responses; otherwise, the response is malformed.
   //
   if (header_map.getStatusValue().empty()) {
+    stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().InvalidStatus);
     return HeaderValidator::ResponseHeaderMapValidationResult::Reject;
   }
 
@@ -237,10 +268,13 @@ Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
     const auto& header_value = header_entry.value();
     const auto& string_header_name = header_name.getStringView();
 
-    if (string_header_name.empty() ||
-        (string_header_name.at(0) == ':' &&
-         !kAllowedPseudoHeaders.contains(header_name.getStringView()))) {
+    if (string_header_name.empty()) {
+      stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().EmptyHeaderName);
+      status = HeaderValidator::ResponseHeaderMapValidationResult::Reject;
+    } else if (string_header_name.at(0) == ':' &&
+               !kAllowedPseudoHeaders.contains(header_name.getStringView())) {
       // This is an unrecognized pseudo header, reject the response
+      stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().InvalidPseudoHeader);
       status = HeaderValidator::ResponseHeaderMapValidationResult::Reject;
     } else if (validateResponseHeaderEntry(header_name, header_value) ==
                HeaderValidator::HeaderEntryValidationResult::Reject) {
@@ -265,9 +299,12 @@ Http2HeaderValidator::validateTEHeader(const ::Envoy::Http::HeaderString& value)
   // in an HTTP/2 request; when it is, it MUST NOT contain any value other
   // than "trailers".
   //
-  return absl::EqualsIgnoreCase(value.getStringView(), header_values_.TEValues.Trailers)
-             ? HeaderValidator::HeaderEntryValidationResult::Accept
-             : HeaderValidator::HeaderEntryValidationResult::Reject;
+  if (!absl::EqualsIgnoreCase(value.getStringView(), header_values_.TEValues.Trailers)) {
+    stream_info_.setResponseCodeDetails(Http2ResponseCodeDetail::get().InvalidTE); // TODO
+    return HeaderValidator::HeaderEntryValidationResult::Reject;
+  }
+
+  return HeaderValidator::HeaderEntryValidationResult::Accept;
 }
 
 HeaderValidator::HeaderEntryValidationResult
@@ -301,6 +338,8 @@ Http2HeaderValidator::validateGenericHeaderName(const ::Envoy::Http::HeaderStrin
 
   const auto& key_string_view = key.getStringView();
   if (kRejectHeaderNames.contains(key_string_view)) {
+    stream_info_.setResponseCodeDetails(
+        Http2ResponseCodeDetail::get().ConnectionHeaderSanitization);
     return HeaderValidator::HeaderEntryValidationResult::Reject;
   }
 

@@ -18,8 +18,8 @@ using ::Envoy::Http::HeaderValidator;
 using ::Envoy::Http::RequestHeaderMap;
 
 HttpHeaderValidator::HttpHeaderValidator(const HeaderValidatorConfig& config,
-                                         StreamInfo::StreamInfo&)
-    : config_(config), header_values_(::Envoy::Http::Headers::get()) {}
+                                         StreamInfo::StreamInfo& stream_info)
+    : config_(config), stream_info_(stream_info), header_values_(::Envoy::Http::Headers::get()) {}
 
 HeaderValidator::HeaderEntryValidationResult
 HttpHeaderValidator::validateMethodHeader(const HeaderString& value) {
@@ -88,8 +88,12 @@ HttpHeaderValidator::validateMethodHeader(const HeaderString& value) {
     }
   }
 
-  return is_valid ? HeaderValidator::HeaderEntryValidationResult::Accept
-                  : HeaderValidator::HeaderEntryValidationResult::Reject;
+  if (!is_valid) {
+    stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().InvalidMethod);
+    return HeaderValidator::HeaderEntryValidationResult::Reject;
+  }
+
+  return HeaderValidator::HeaderEntryValidationResult::Accept;
 }
 
 HeaderValidator::HeaderEntryValidationResult
@@ -109,6 +113,7 @@ HttpHeaderValidator::validateSchemeHeader(const HeaderString& value) {
   const auto& value_string_view = value.getStringView();
 
   if (value_string_view.empty()) {
+    stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().InvalidScheme);
     return HeaderValidator::HeaderEntryValidationResult::Reject;
   }
 
@@ -118,11 +123,13 @@ HttpHeaderValidator::validateSchemeHeader(const HeaderString& value) {
   auto valid_first_character = (*character_it >= 'a' && *character_it <= 'z') ||
                                (*character_it >= 'A' && *character_it <= 'Z');
   if (!valid_first_character) {
+    stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().InvalidScheme);
     return HeaderValidator::HeaderEntryValidationResult::Reject;
   }
 
   for (++character_it; character_it != value_string_view.end(); ++character_it) {
     if (!test_char(kSchemeHeaderCharTable, *character_it)) {
+      stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().InvalidScheme);
       return HeaderValidator::HeaderEntryValidationResult::Reject;
     }
   }
@@ -156,35 +163,36 @@ HttpHeaderValidator::validateStatusHeader(const StatusPseudoHeaderValidationMode
   std::uint32_t status_value{};
   auto result = std::from_chars(buffer_start, buffer_end, status_value);
   if (result.ec == std::errc::invalid_argument || result.ptr != buffer_end) {
+    stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().InvalidStatus);
     return HeaderValidator::HeaderEntryValidationResult::Reject;
   }
 
-  auto status{HeaderValidator::HeaderEntryValidationResult::Reject};
+  bool is_valid = false;
 
   switch (mode) {
   case StatusPseudoHeaderValidationMode::WholeNumber:
-    status = HeaderValidator::HeaderEntryValidationResult::Accept;
+    is_valid = true;
     break;
 
   case StatusPseudoHeaderValidationMode::ValueRange:
-    if (status_value >= kMinimumResponseStatusCode && status_value <= kMaximumResponseStatusCode) {
-      status = HeaderValidator::HeaderEntryValidationResult::Accept;
-    }
-
+    is_valid =
+        status_value >= kMinimumResponseStatusCode && status_value <= kMaximumResponseStatusCode;
     break;
 
   case StatusPseudoHeaderValidationMode::OfficialStatusCodes:
-    if (kOfficialStatusCodes.contains(status_value)) {
-      status = HeaderValidator::HeaderEntryValidationResult::Accept;
-    }
-
+    is_valid = kOfficialStatusCodes.contains(status_value);
     break;
 
   default:
     break;
   }
 
-  return status;
+  if (!is_valid) {
+    stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().InvalidStatus);
+    return HeaderValidator::HeaderEntryValidationResult::Reject;
+  }
+
+  return HeaderValidator::HeaderEntryValidationResult::Accept;
 }
 
 HeaderValidator::HeaderEntryValidationResult
@@ -208,15 +216,27 @@ HttpHeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   bool allow_underscores = !config_.reject_headers_with_underscores();
   // This header name is initially invalid if the name is empty or if the name
   // matches an incompatible connection-specific header.
-  bool is_valid = !key_string_view.empty();
+  if (key_string_view.empty()) {
+    stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().EmptyHeaderName);
+    return HeaderValidator::HeaderEntryValidationResult::Reject;
+  }
+
+  bool is_valid = true;
+  char c = '\0';
 
   for (std::size_t i{0}; i < key_string_view.size() && is_valid; ++i) {
-    char c = key_string_view.at(i);
+    c = key_string_view.at(i);
     is_valid = test_char(kGenericHeaderNameCharTable, c) && (c != '_' || allow_underscores);
   }
 
-  return is_valid ? HeaderValidator::HeaderEntryValidationResult::Accept
-                  : HeaderValidator::HeaderEntryValidationResult::Reject;
+  if (!is_valid) {
+    auto details = c == '_' ? UhvResponseCodeDetail::get().InvalidUnderscore
+                            : UhvResponseCodeDetail::get().InvalidCharacters;
+    stream_info_.setResponseCodeDetails(details);
+    return HeaderValidator::HeaderEntryValidationResult::Reject;
+  }
+
+  return HeaderValidator::HeaderEntryValidationResult::Accept;
 }
 
 HeaderValidator::HeaderEntryValidationResult
@@ -242,8 +262,12 @@ HttpHeaderValidator::validateGenericHeaderValue(const HeaderString& value) {
     is_valid = test_char(kGenericHeaderValueCharTable, value_string_view.at(i));
   }
 
-  return is_valid ? HeaderValidator::HeaderEntryValidationResult::Accept
-                  : HeaderValidator::HeaderEntryValidationResult::Reject;
+  if (!is_valid) {
+    stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().InvalidCharacters);
+    return HeaderValidator::HeaderEntryValidationResult::Reject;
+  }
+
+  return HeaderValidator::HeaderEntryValidationResult::Accept;
 }
 
 HeaderValidator::HeaderEntryValidationResult
@@ -256,6 +280,7 @@ HttpHeaderValidator::validateContentLengthHeader(const HeaderString& value) {
   const auto& value_string_view = value.getStringView();
 
   if (value_string_view.empty()) {
+    stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().InvalidContentLength);
     return HeaderValidator::HeaderEntryValidationResult::Reject;
   }
 
@@ -265,6 +290,7 @@ HttpHeaderValidator::validateContentLengthHeader(const HeaderString& value) {
   std::uint32_t int_value{};
   auto result = std::from_chars(buffer_start, buffer_end, int_value);
   if (result.ec == std::errc::invalid_argument || result.ptr != buffer_end) {
+    stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().InvalidContentLength);
     return HeaderValidator::HeaderEntryValidationResult::Reject;
   }
 
@@ -285,6 +311,7 @@ HttpHeaderValidator::validateHostHeader(const HeaderString& value) {
   auto user_info_delimiter = value_string_view.find('@');
   if (user_info_delimiter != absl::string_view::npos) {
     // :authority cannot contain user info, reject the header
+    stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().InvalidHost);
     return HeaderValidator::HeaderEntryValidationResult::Reject;
   }
 
@@ -294,6 +321,7 @@ HttpHeaderValidator::validateHostHeader(const HeaderString& value) {
 
   if (host_string_view.empty()) {
     // reject empty host, which happens if the authority is just the port (e.g.- ":80").
+    stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().InvalidHost);
     return HeaderValidator::HeaderEntryValidationResult::Reject;
   }
 
@@ -303,6 +331,7 @@ HttpHeaderValidator::validateHostHeader(const HeaderString& value) {
 
     auto port_string_view_size = port_string_view.size();
     if (port_string_view_size == 0 || port_string_view_size > 5) {
+      stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().InvalidHost);
       return HeaderValidator::HeaderEntryValidationResult::Reject;
     }
 
@@ -312,10 +341,12 @@ HttpHeaderValidator::validateHostHeader(const HeaderString& value) {
     std::uint32_t port_integer_value{};
     auto result = std::from_chars(buffer_start, buffer_end, port_integer_value);
     if (result.ec == std::errc::invalid_argument || result.ptr != buffer_end) {
+      stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().InvalidHost);
       return HeaderValidator::HeaderEntryValidationResult::Reject;
     }
 
     if (port_integer_value == 0 || port_integer_value >= 65535) {
+      stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().InvalidHost);
       return HeaderValidator::HeaderEntryValidationResult::Reject;
     }
   }
@@ -333,8 +364,12 @@ HttpHeaderValidator::validateGenericPathHeader(const HeaderString& value) {
     is_valid = test_char(kPathHeaderCharTable, path.at(i));
   }
 
-  return is_valid ? HeaderValidator::HeaderEntryValidationResult::Accept
-                  : HeaderValidator::HeaderEntryValidationResult::Reject;
+  if (!is_valid) {
+    stream_info_.setResponseCodeDetails(UhvResponseCodeDetail::get().InvalidUrl);
+    return HeaderValidator::HeaderEntryValidationResult::Reject;
+  }
+
+  return HeaderValidator::HeaderEntryValidationResult::Accept;
 }
 
 } // namespace EnvoyDefault
