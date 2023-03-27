@@ -124,9 +124,9 @@ pyparsing==3.0.9 \
     # via
     #   -r requirements.in
     #   packaging
-pytz==2022.4 \
-    --hash=sha256:2c0784747071402c6e99f0bafdb7da0fa22645f06554c7ae06bf6358897e9c91 \
-    --hash=sha256:48ce799d83b6f8aab2020e369b627446696619e79645419610b9facd909b3174
+pytz==2023.2 \
+    --hash=sha256:8a8baaf1e237175b02f5c751eea67168043a749c843989e2b3015aa1ad9db68b \
+    --hash=sha256:a27dcf612c05d2ebde626f7d506555f10dfc815b3eddccfaadfc7d99b11c9a07
     # via -r requirements.in
 requests==2.28.1 \
     --hash=sha256:7c5599b102feddaa661c826c56ab4fee28bfd17f5abca1ebbe3e7f19d7c97983 \
