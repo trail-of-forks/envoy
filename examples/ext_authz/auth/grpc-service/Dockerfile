@@ -1,4 +1,4 @@
-FROM golang:alpine@sha256:d475cef843a02575ebdcb1416d98cd76bab90a5ae8bc2cd15f357fc08b6a329f AS builder
+FROM golang:alpine@sha256:08e9c086194875334d606765bd60aa064abd3c215abfbcf5737619110d48d114 AS builder
 
 RUN apk --no-cache add make
 COPY . /app
