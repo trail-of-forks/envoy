@@ -1,1 +1,1 @@
-FROM jmalloc/echo-server@sha256:e43a10c9ecbd025df7ed6dac1e45551ce7bd676142600b0734fe7dcd10a47abe
+FROM jmalloc/echo-server@sha256:57110914108448e6692cd28fc602332357f91951d74ca12217a347b1f7df599c
