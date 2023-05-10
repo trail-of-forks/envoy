@@ -102,9 +102,9 @@ pygithub==1.55 \
     --hash=sha256:1bbfff9372047ff3f21d5cd8e07720f3dbfdaf6462fcaed9d815f528f1ba7283 \
     --hash=sha256:2caf0054ea079b71e539741ae56c5a95e073b81fa472ce222e81667381b9601b
     # via -r requirements.in
-pyjwt==2.5.0 \
-    --hash=sha256:8d82e7087868e94dd8d7d418e5088ce64f7daab4b36db654cbaedb46f9d1ca80 \
-    --hash=sha256:e77ab89480905d86998442ac5788f35333fa85f65047a534adc38edf3c88fc3b
+pyjwt==2.7.0 \
+    --hash=sha256:ba2b425b15ad5ef12f200dc67dd56af4e26de2331f965c5439994dad075876e1 \
+    --hash=sha256:bd6ca4a3c4285c1a2d4349e5a035fdf8fb94e04ccd0fcbe6ba289dae9cc3e074
     # via pygithub
 pynacl==1.5.0 \
     --hash=sha256:401002a4aaa07c9414132aaed7f6836ff98f59277a234704ff66878c2ee4a0d1 \
