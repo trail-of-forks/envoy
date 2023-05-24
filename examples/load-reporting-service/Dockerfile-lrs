@@ -1,4 +1,4 @@
-FROM golang@sha256:a452d6273ad03a47c2f29b898d6bb57630e77baf839651ef77d03e4e049c5bf3
+FROM golang@sha256:690e4135bf2a4571a572bfd5ddfa806b1cb9c3dea0446ebadaf32bc2ea09d4f9
 
 COPY ./server /go/src/github.com/envoyproxy/envoy/example/load-reporting-service/server
 COPY *.go /go/src/github.com/envoyproxy/envoy/example/load-reporting-service/
